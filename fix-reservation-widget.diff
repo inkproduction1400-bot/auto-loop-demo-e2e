@@ -1,0 +1,94 @@
+diff --git a/tests/e2e/pages/ReservationWidget.ts b/tests/e2e/pages/ReservationWidget.ts
+index aaaaaaa..bbbbbbb 100644
+--- a/tests/e2e/pages/ReservationWidget.ts
++++ b/tests/e2e/pages/ReservationWidget.ts
+@@ -1,6 +1,6 @@
+ import { Page } from '@playwright/test';
+ 
+ export interface AttendeeInput {
+   adult?: number;
+   student?: number;
+   child?: number;
+   infant?: number;
+ }
+ 
+ export interface CustomerInput {
+   name: string;
+   email: string;
+   phone: string;
+ }
+ 
+ export class ReservationWidget {
+   constructor(private page: Page) {}
+ 
+   async waitForWidget() {
+-    await this.page.waitForSelector('[data-test="widget-container"]');
++    await this.page.waitForSelector('[data-test="widget-container"]');
+   }
+ 
+   async selectDate(date: string) {
+-    await this.page.locator('[data-test="date-picker"]').click();
+-    await this.page.locator(`[data-test="date-${date}"]`).click();
++    await this.page.locator('[data-test="date-picker"], [data-test-date-picker]').click();
++    await this.page.locator(`[data-test="date-${date}"], [data-test-date="${date}"]`).click();
+   }
+ 
+   async selectTimeSlot(time: string) {
+-    await this.page.locator(`[data-test="slot-${time}"]`).click();
++    await this.page.locator(`[data-test="slot-${time}"], [data-test-slot="${time}"]`).click();
+   }
+ 
+   async inputAttendees(attendees: AttendeeInput) {
+     if (attendees.adult !== undefined) {
+       await this.page.locator('[data-test-adult-count]').fill(String(attendees.adult));
+     }
+     if (attendees.student !== undefined) {
+       await this.page.locator('[data-test-student-count]').fill(String(attendees.student));
+     }
+     if (attendees.child !== undefined) {
+       await this.page.locator('[data-test-child-count]').fill(String(attendees.child));
+     }
+     if (attendees.infant !== undefined) {
+       await this.page.locator('[data-test-infant-count]').fill(String(attendees.infant));
+     }
+   }
+ 
+   async fillCustomerInfo(customer: CustomerInput) {
+     await this.page.locator('[data-test-customer-name]').fill(customer.name);
+     await this.page.locator('[data-test-customer-email]').fill(customer.email);
+     await this.page.locator('[data-test-customer-phone]').fill(customer.phone);
+   }
+ 
+   async completePayment(cardNumber: string = '4242424242424242') {
+     await this.page.locator('[data-test-card-number]').fill(cardNumber);
+     await this.page.locator('[data-test-card-expiry]').fill('12/25');
+     await this.page.locator('[data-test-card-cvc]').fill('123');
+-    await this.page.locator('[data-test="pay-button"]').click();
++    await this.page.locator('[data-test="pay-button"], [data-test-pay-button]').click();
+   }
+ 
+   async getConfirmationMessage() {
+-    return await this.page.locator('[data-test="reservation-complete"]').textContent();
++    return await this.page.locator('[data-test="reservation-complete"], [data-test-reservation-complete], [data-test="booking-confirmed"]').textContent();
+   }
+ 
+   async getErrorMessage() {
+-    return await this.page.locator('[data-test="error-message"]').textContent();
++    return await this.page.locator('[data-test="error-message"], [data-test-error-message]').textContent();
+   }
+ 
+   async getTotalAmount() {
+-    const amountText = await this.page.locator('[data-test="amount"]').getAttribute('data-test-amount');
++    const amountText = await this.page.locator('[data-test="amount"], [data-test-amount]').getAttribute('data-test-amount');
+     return amountText ? parseInt(amountText, 10) : 0;
+   }
+ 
+   async isDateDisabled(date: string) {
+-    const el = this.page.locator(`[data-test="date-${date}"]`);
+-    return (await el.getAttribute('data-test-disabled')) === 'true';
++    const el = this.page.locator(`[data-test="date-${date}"], [data-test-date="${date}"]`);
++    const v1 = await el.getAttribute('data-test-disabled');
++    const v2 = await el.getAttribute('data-test-date-disabled');
++    return v1 === 'true' || v2 === 'true';
+   }
+ }

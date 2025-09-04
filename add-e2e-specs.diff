@@ -1,0 +1,181 @@
+diff --git a/tests/e2e/pages/ReservationWidget.ts b/tests/e2e/pages/ReservationWidget.ts
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/tests/e2e/pages/ReservationWidget.ts
+@@ -0,0 +1,78 @@
++import { Page } from '@playwright/test';
++
++export interface AttendeeInput {
++  adult?: number;
++  student?: number;
++  child?: number;
++  infant?: number;
++}
++
++export interface CustomerInput {
++  name: string;
++  email: string;
++  phone: string;
++}
++
++export class ReservationWidget {
++  constructor(private page: Page) {}
++
++  async waitForWidget() {
++    await this.page.waitForSelector('[data-test="widget-container"]');
++  }
++
++  async selectDate(date: string) {
++    await this.page.locator('[data-test="date-picker"]').click();
++    await this.page.locator(`[data-test="date-${date}"]`).click();
++  }
++
++  async selectTimeSlot(time: string) {
++    await this.page.locator(`[data-test="slot-${time}"]`).click();
++  }
++
++  async inputAttendees(attendees: AttendeeInput) {
++    if (attendees.adult !== undefined) {
++      await this.page.locator('[data-test="count-adult"]').fill(String(attendees.adult));
++    }
++    if (attendees.student !== undefined) {
++      await this.page.locator('[data-test="count-junior"]').fill(String(attendees.student));
++    }
++    if (attendees.child !== undefined) {
++      await this.page.locator('[data-test="count-child"]').fill(String(attendees.child));
++    }
++    if (attendees.infant !== undefined) {
++      await this.page.locator('[data-test="count-infant"]').fill(String(attendees.infant));
++    }
++  }
++
++  async fillCustomerInfo(customer: CustomerInput) {
++    await this.page.locator('[data-test="customer-name"]').fill(customer.name);
++    await this.page.locator('[data-test="customer-email"]').fill(customer.email);
++    await this.page.locator('[data-test="customer-phone"]').fill(customer.phone);
++  }
++
++  async completePayment(cardNumber: string = '4242424242424242') {
++    await this.page.locator('[data-test="payment-form"]').waitFor();
++    await this.page.locator('[data-test="card-number"]').fill(cardNumber);
++    await this.page.locator('[data-test="card-expiry"]').fill('12/26');
++    await this.page.locator('[data-test="card-cvc"]').fill('123');
++    await this.page.locator('[data-test="pay-button"]').click();
++  }
++
++  async getConfirmationMessage() {
++    return this.page.locator('[data-test="booking-confirmed"]').textContent();
++  }
++
++  async getErrorMessage() {
++    return this.page.locator('[data-test="error-message"]').textContent();
++  }
++
++  async getTotalAmount(): Promise<number> {
++    const el = this.page.locator('[data-test="price-total"]');
++    const txt = await el.textContent();
++    const m = txt?.match(/\d+/g);
++    return m ? parseInt(m.join(''), 10) : 0;
++  }
++
++  async isDateDisabled(date: string) {
++    const el = this.page.locator(`[data-test="date-${date}"]`);
++    return (await el.getAttribute('data-test-disabled')) === 'true';
++  }
++}
+diff --git a/tests/e2e/reservation-flow.spec.ts b/tests/e2e/reservation-flow.spec.ts
+new file mode 100644
+index 0000000..2222222
+--- /dev/null
++++ b/tests/e2e/reservation-flow.spec.ts
+@@ -0,0 +1,124 @@
++import { test, expect } from '@playwright/test';
++import { ReservationWidget } from './pages/ReservationWidget';
++import { testData } from './fixtures/testData';
++
++test.describe('Reservation Flow - Normal', () => {
++  let widget: ReservationWidget;
++
++  test.beforeEach(async ({ page }) => {
++    await page.goto('/');
++    widget = new ReservationWidget(page);
++    await widget.waitForWidget();
++  });
++
++  test('E2E-001: Basic reservation completes', async ({ page }) => {
++    await widget.selectDate(testData.dates.tomorrow);
++    await widget.selectTimeSlot('14:00-14:30');
++    await widget.inputAttendees({ adult: 2 });
++    await widget.fillCustomerInfo(testData.customers.valid);
++    await widget.completePayment(testData.cards.success);
++    await expect(page.locator('[data-test="booking-confirmed"]')).toBeVisible();
++  });
++
++  test('E2E-002: Mixed attendees calculates total', async () => {
++    await widget.selectDate(testData.dates.tomorrow);
++    await widget.selectTimeSlot('14:00-14:30');
++    await widget.inputAttendees({ adult: 2, student: 1 });
++    const amount = await widget.getTotalAmount();
++    expect(amount).toBeGreaterThan(0);
++  });
++
++  test('E2E-004: 90 days advance reservation allowed', async ({ page }) => {
++    await widget.selectDate(testData.dates.day90Later);
++    await widget.selectTimeSlot('14:00-14:30');
++    await widget.inputAttendees({ adult: 1 });
++    await widget.fillCustomerInfo(testData.customers.valid);
++    await widget.completePayment(testData.cards.success);
++    await expect(page.locator('[data-test="booking-confirmed"]')).toBeVisible();
++  });
++});
++
++test.describe('Reservation Flow - Errors', () => {
++  let widget: ReservationWidget;
++
++  test.beforeEach(async ({ page }) => {
++    await page.goto('/');
++    widget = new ReservationWidget(page);
++    await widget.waitForWidget();
++  });
++
++  test('E2E-008: 91 days advance is disabled', async () => {
++    const disabled = await widget.isDateDisabled(testData.dates.day91Later);
++    expect(disabled).toBe(true);
++  });
++
++  test('E2E-010: Payment decline shows error', async ({ page }) => {
++    await widget.selectDate(testData.dates.tomorrow);
++    await widget.selectTimeSlot('14:00-14:30');
++    await widget.inputAttendees({ adult: 1 });
++    await widget.fillCustomerInfo(testData.customers.valid);
++    await widget.completePayment(testData.cards.decline);
++    await expect(page.locator('[data-test="error-payment-declined"]')).toBeVisible();
++  });
++});
+diff --git a/tests/e2e/cancellation-flow.spec.ts b/tests/e2e/cancellation-flow.spec.ts
+new file mode 100644
+index 0000000..3333333
+--- /dev/null
++++ b/tests/e2e/cancellation-flow.spec.ts
+@@ -0,0 +1,78 @@
++import { test, expect } from '@playwright/test';
++import { testData } from './fixtures/testData';
++
++test.describe('Cancellation Flow', () => {
++  test.beforeEach(async ({ page }) => {
++    await page.goto('/cancel');
++  });
++
++  test('E2E-015: Same day no refund', async ({ page }) => {
++    await page.locator('[data-test="booking-search"]').fill('RES-TEST-TODAY');
++    await page.locator('[data-test="cancel-button"]').click();
++    await expect(page.locator('[data-test="refund-rate-0"]')).toBeVisible();
++  });
++
++  test('E2E-016: Deadline exceeded error', async ({ page }) => {
++    await page.locator('[data-test="booking-search"]').fill('RES-TEST-23H');
++    await page.locator('[data-test="cancel-button"]').click();
++    await expect(page.locator('[data-test="error-deadline-passed"]')).toBeVisible();
++  });
++});

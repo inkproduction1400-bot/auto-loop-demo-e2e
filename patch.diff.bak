@@ -1,0 +1,67 @@
+diff --git a/tests/unit/utils/cache.test.ts b/tests/unit/utils/cache.test.ts
+index aaaaaaa..bbbbbbb 100644
+--- a/tests/unit/utils/cache.test.ts
++++ b/tests/unit/utils/cache.test.ts
+@@ -103,7 +103,22 @@ describe('Cache', () => {
+      it('should remove expired entries on cleanup', () => {
+        vi.useFakeTimers();
+ 
+-      cache.set('key1', 'value1');
++      cache.set('key1', 'value1', 5);
++      cache.set('key2', 'value2', 10);
++
++      vi.advanceTimersByTime(6000);
++
++      cache.cleanup();
++
++      expect(cache.size()).toBe(1);
++      expect(cache.get('key2')).toBe('value2');
++
++      vi.useRealTimers();
++    });
++  });
++});
+diff --git a/tests/e2e/fixtures/testData.ts b/tests/e2e/fixtures/testData.ts
+new file mode 100644
+index 0000000..ccccccc
+--- /dev/null
++++ b/tests/e2e/fixtures/testData.ts
+@@ -0,0 +1,36 @@
++export const testData = {
++  tenants: {
++    primary: {
++      id: 'test-tenant-001',
++      apiKey: 'sk_test_ADMIN_KEY_FOR_TESTING'
++    },
++    secondary: {
++      id: 'test-tenant-002',
++      apiKey: 'sk_test_ADMIN_KEY_FOR_TESTING_2'
++    }
++  },
++
++  customers: {
++    valid: {
++      name: 'テスト太郎',
++      email: 'test@example.com',
++      phone: '+81901234567'
++    },
++    invalid: {
++      email: 'invalid-email',
++      phone: '123'
++    }
++  },
++
++  cards: {
++    success: '4242424242424242',
++    decline: '4000000000000002',
++    authRequired: '4000002500003155'
++  },
++
++  dates: {
++    today: '2025-03-01',
++    tomorrow: '2025-03-02',
++    day7Later: '2025-03-08',
++    day90Later: '2025-05-30',
++    day91Later: '2025-05-31'
++  }
++};

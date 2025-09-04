@@ -1,0 +1,23 @@
+diff --git a/tests/unit/utils/cache.test.ts b/tests/unit/utils/cache.test.ts
+index aaaaaaa..bbbbbbb 100644
+--- a/tests/unit/utils/cache.test.ts
++++ b/tests/unit/utils/cache.test.ts
+@@ -103,7 +103,22 @@ describe('Cache', () => {
+      it('should remove expired entries on cleanup', () => {
+        vi.useFakeTimers();
+ 
+-      cache.set('key1', 'value1');
++      cache.set('key1', 'value1', 5);
++      cache.set('key2', 'value2', 10);
++
++      vi.advanceTimersByTime(6000);
++
++      cache.cleanup();
++
++      expect(cache.size()).toBe(1);
++      expect(cache.get('key2')).toBe('value2');
++
++      vi.useRealTimers();
++    });
++  });
++});
