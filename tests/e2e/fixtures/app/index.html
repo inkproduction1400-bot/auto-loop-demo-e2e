@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <title>Reservation Widget (Fixture)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    body { margin: 24px; }
+    .row { display: grid; grid-template-columns: 160px 1fr; gap: 8px; align-items: center; margin: 8px 0; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(120px, 1fr)); gap: 8px; margin: 8px 0; }
+    button { padding: 8px 12px; cursor: pointer; }
+    input { padding: 6px 8px; width: 220px; }
+    .muted { color: #666; }
+    .hidden { display: none !important; }
+    .ok { color: #0a7f3f; font-weight: 600; }
+    .err { color: #b00020; font-weight: 600; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin: 12px 0; }
+  </style>
+</head>
+<body>
+  <h1>予約ウィジェット（テスト用フィクスチャ）</h1>
+
+  <!-- コンテナ検出用 -->
+  <div class="card" data-test="widget-container" data-test-widget-loaded="true">
+    <!-- 日付選択 -->
+    <div class="row">
+      <div class="muted">日付</div>
+      <div>
+        <button data-test="date-picker" aria-expanded="false">日付を選択</button>
+        <div id="calendar" class="grid hidden" role="group" aria-label="日付">
+          <!-- テストが触る代表日付。両方のセレクタに対応 -->
+          <button data-test="date-2025-03-02" data-test-date="2025-03-02">2025-03-02</button>
+          <button data-test="date-2025-05-30" data-test-date="2025-05-30">2025-05-30</button>
+          <!-- 91日先はブロック：data-test-disabled="true" を持つ -->
+          <button data-test="date-2025-05-31" data-test-date="2025-05-31" data-test-disabled="true" disabled>
+            2025-05-31（無効）
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 時間帯（時間帯表記で統一：14:00-14:30 など） -->
+    <div class="row">
+      <div class="muted">時間帯</div>
+      <div class="grid" role="group" aria-label="時間帯">
+        <button data-test="slot-10:00-10:30" data-test-slot="10:00-10:30">10:00–10:30</button>
+        <button data-test="slot-14:00-14:30" data-test-slot="14:00-14:30">14:00–14:30</button>
+        <button data-test="slot-16:00-16:30" data-test-slot="16:00-16:30">16:00–16:30</button>
+      </div>
+    </div>
+
+    <!-- 人数入力（両方のセレクタで取れるように data-test と data-test-xxx-count を併記） -->
+    <div class="row">
+      <div class="muted">大人</div>
+      <input type="number" min="0" value="1"
+             data-test="adult-count" data-test-adult-count />
+    </div>
+    <div class="row">
+      <div class="muted">学生</div>
+      <input type="number" min="0" value="0"
+             data-test="student-count" data-test-student-count />
+    </div>
+    <div class="row">
+      <div class="muted">小人</div>
+      <input type="number" min="0" value="0"
+             data-test="child-count" data-test-child-count />
+    </div>
+    <div class="row">
+      <div class="muted">幼児</div>
+      <input type="number" min="0" value="0"
+             data-test="infant-count" data-test-infant-count />
+    </div>
+
+    <!-- 料金表示（属性とテキストの両面で露出） -->
+    <div class="row">
+      <div class="muted">合計</div>
+      <div>
+        <span id="amountLabel"
+              data-test="amount"
+              data-test-amount="0">¥0</span>
+      </div>
+    </div>
+
+    <!-- お客様情報 -->
+    <div class="row">
+      <div class="muted">氏名</div>
+      <input type="text" value="テスト太郎"
+             data-test="customer-name" data-test-customer-name />
+    </div>
+    <div class="row">
+      <div class="muted">メール</div>
+      <input type="email" value="test@example.com"
+             data-test="customer-email" data-test-customer-email />
+    </div>
+    <div class="row">
+      <div class="muted">電話</div>
+      <input type="tel" value="+81901234567"
+             data-test="customer-phone" data-test-customer-phone />
+    </div>
+
+    <!-- 簡易的な支払い UI（テスト用の疑似挙動） -->
+    <div class="card">
+      <div class="row">
+        <div class="muted">カード番号</div>
+        <input type="text" value="4242424242424242"
+               data-test="card-number" data-test-card-number />
+      </div>
+      <div class="row">
+        <div class="muted">有効期限</div>
+        <input type="text" value="12/25"
+               data-test="card-expiry" data-test-card-expiry />
+      </div>
+      <div class="row">
+        <div class="muted">CVC</div>
+        <input type="text" value="123"
+               data-test="card-cvc" data-test-card-cvc />
+      </div>
+      <button data-test="pay-button">支払う</button>
+      <!-- 失敗/成功フラグ（両系統のセレクタに対応） -->
+      <div id="payError" class="err hidden"
+           data-test="payment-error" data-test-error-message>
+        決済に失敗しました
+      </div>
+      <div id="payOk" class="ok hidden"
+           data-test="booking-confirmed" data-test-reservation-complete>
+        ご予約ありがとうございました！
+      </div>
+    </div>
+
+    <!-- デバッグ表示 -->
+    <div class="muted" id="debug"></div>
+  </div>
+
+  <script>
+    (function () {
+      // 料金表
+      const PRICE = { adult: 3000, student: 1500, child: 1000, infant: 0 };
+
+      // 要素参照
+      const el = {
+        calendar: document.getElementById('calendar'),
+        datePickerBtn: document.querySelector('[data-test="date-picker"]'),
+        amount: document.getElementById('amountLabel'),
+        inputs: {
+          adult: document.querySelector('[data-test="adult-count"]'),
+          student: document.querySelector('[data-test="student-count"]'),
+          child: document.querySelector('[data-test="child-count"]'),
+          infant: document.querySelector('[data-test="infant-count"]'),
+          name: document.querySelector('[data-test="customer-name"]'),
+          email: document.querySelector('[data-test="customer-email"]'),
+          phone: document.querySelector('[data-test="customer-phone"]'),
+          card: {
+            number: document.querySelector('[data-test="card-number"]'),
+            expiry: document.querySelector('[data-test="card-expiry"]'),
+            cvc: document.querySelector('[data-test="card-cvc"]')
+          }
+        },
+        payBtn: document.querySelector('[data-test="pay-button"]'),
+        payOk: document.getElementById('payOk'),
+        payErr: document.getElementById('payError'),
+        debug: document.getElementById('debug')
+      };
+
+      let state = {
+        date: null,
+        slot: null
+      };
+
+      // カレンダー表示切替
+      el.datePickerBtn.addEventListener('click', () => {
+        const opened = el.calendar.classList.toggle('hidden');
+        el.datePickerBtn.setAttribute('aria-expanded', String(!opened));
+      });
+
+      // 日付クリック
+      el.calendar.addEventListener('click', (e) => {
+        const b = e.target.closest('button');
+        if (!b) return;
+        if (b.getAttribute('data-test-disabled') === 'true') {
+          // 無効日は選べない
+          return;
+        }
+        const d = b.getAttribute('data-test-date') || (b.dataset.test || '').replace('date-', '');
+        state.date = d;
+        el.calendar.classList.add('hidden');
+        el.datePickerBtn.textContent = `選択中: ${d}`;
+        render();
+      });
+
+      // スロットクリック（親コンテナでデリゲート）
+      document.querySelector('[aria-label="時間帯"]').addEventListener('click', (e) => {
+        const b = e.target.closest('button');
+        if (!b) return;
+        const val = b.getAttribute('data-test-slot') || (b.dataset.test || '').replace('slot-', '');
+        state.slot = val;
+        render();
+      });
+
+      // 入力イベントで合計更新
+      ['adult','student','child','infant'].forEach(k => {
+        el.inputs[k].addEventListener('input', render);
+      });
+
+      // 決済ボタン
+      el.payBtn.addEventListener('click', () => {
+        el.payOk.classList.add('hidden');
+        el.payErr.classList.add('hidden');
+
+        // 疑似決済：この番号なら失敗
+        const decline = '4000000000000002';
+        const num = (el.inputs.card.number.value || '').replace(/\s+/g, '');
+        if (num === decline) {
+          el.payErr.classList.remove('hidden');
+          return;
+        }
+        // 成功
+        el.payOk.classList.remove('hidden');
+      });
+
+      function calcAmount() {
+        const n = {
+          adult: +el.inputs.adult.value || 0,
+          student: +el.inputs.student.value || 0,
+          child: +el.inputs.child.value || 0,
+          infant: +el.inputs.infant.value || 0
+        };
+        return n.adult*PRICE.adult + n.student*PRICE.student + n.child*PRICE.child + n.infant*PRICE.infant;
+      }
+
+      function render() {
+        const amt = calcAmount();
+        el.amount.dataset.testAmount = String(amt);
+        el.amount.textContent = '¥' + amt.toLocaleString('ja-JP');
+
+        el.debug.textContent =
+          `date=${state.date || '-'} / slot=${state.slot || '-'} / amount=${amt}`;
+      }
+
+      render();
+    })();
+  </script>
+</body>
+</html>
