@@ -4,14 +4,13 @@ export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 30_000,
   retries: 0,
-  fullyParallel: true,
   reporter: [
     ['list'],
     ['junit', { outputFile: 'test-results/junit.xml' }],
-    ['html', { outputFolder: 'playwright-report', open: 'never' }],
+    ['blob', { outputDir: 'blob-report' }],
   ],
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://localhost:3100',
     trace: 'on-first-retry',
     video: 'retain-on-failure',
     screenshot: 'only-on-failure',
@@ -22,10 +21,8 @@ export default defineConfig({
     { name: 'webkit',   use: { ...devices['Desktop Safari'] } },
   ],
   webServer: {
-    command: 'npm run dev',
-    port: 5173,
+    command: 'npm run dev -- --port=3100',
+    port: 3100,
     reuseExistingServer: true,
-    stdout: 'pipe',
-    stderr: 'pipe',
   },
 });
