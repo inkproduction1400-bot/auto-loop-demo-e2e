@@ -26,6 +26,13 @@ jobs:
         project: [chromium, firefox, webkit]
       max-parallel: 3
 
+    # ✅ ここで Job 全体に Stripe/BASE_URL を注入（Playwright → webServer にも伝搬）
+    env:
+      CI: true
+      NEXT_PUBLIC_BASE_URL: "http://localhost:3100"
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+      STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -42,11 +49,9 @@ jobs:
       - name: Install Playwright browsers & deps
         run: npx playwright install --with-deps
 
-      # config 側で reporter=[list,junit,blob]。HTMLはここでは生成しない
+      # config 側で reporter=[blob,junit]（HTMLはここでは生成しない）
       - name: Run tests (${{ matrix.project }})
         run: npx playwright test --project="${{ matrix.project }}" --workers=1
-        env:
-          CI: true
 
       - name: Upload blob report (per-project)
         if: always()
