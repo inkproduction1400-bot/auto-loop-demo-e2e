@@ -42,7 +42,7 @@ jobs:
       - name: Install Playwright browsers & deps
         run: npx playwright install --with-deps
 
-      # config 側で reporter = [list, junit, blob] 前提。HTMLはここでは生成しない
+      # config 側で reporter=[list,junit,blob]。HTMLはここでは生成しない
       - name: Run tests (${{ matrix.project }})
         run: npx playwright test --project="${{ matrix.project }}" --workers=1
         env:
@@ -70,9 +70,14 @@ jobs:
     name: Publish combined HTML report to GitHub Pages
     needs: [test]
     runs-on: ubuntu-latest
-    # テストが失敗しても Pages へ公開してデバッグできるようにする
+    # テストが失敗しても HTML を公開してデバッグ可能に
     if: ${{ always() && github.ref == 'refs/heads/main' }}
     timeout-minutes: 20
+
+    # ★ これが必須：GitHub Pages 用の environment を指定
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout
