@@ -32,6 +32,7 @@ jobs:
       NEXT_PUBLIC_BASE_URL: "http://localhost:3100"
       STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
       STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+      E2E_STRIPE_MOCK: "1" 
 
     steps:
       - name: Checkout
