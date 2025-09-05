@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { ReservationWidget } from './pages/ReservationWidget';
+import { ReservationWidget } from './fixtures/ReservationWidget';
 import { testData } from './fixtures/testData';
 
 test.describe('Reservation Flow - Normal', () => {

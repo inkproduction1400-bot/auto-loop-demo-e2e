@@ -4,3 +4,5 @@ coverage/
 test-results/
 .env*
 .DS_Store
+
+/generated/prisma

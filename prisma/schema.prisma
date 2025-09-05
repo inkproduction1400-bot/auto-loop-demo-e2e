@@ -1,0 +1,41 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  phone     String?
+  createdAt DateTime @default(now())
+  reservations Reservation[]
+}
+
+model Reservation {
+  id        String   @id @default(cuid())
+  date      DateTime
+  slot      String
+  counts    Json     // { adult, student, child, infant }
+  amount    Int      // 円
+  status    ReservationStatus @default(PENDING)
+  paymentIntentId String?     // Stripe連携時に使用
+  notes     String?
+
+  customer  Customer @relation(fields: [customerId], references: [id])
+  customerId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum ReservationStatus {
+  PENDING
+  PAID
+  CANCELED
+  FAILED
+}

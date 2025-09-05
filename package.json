@@ -5,25 +5,40 @@
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
-    "dev": "http-server tests/e2e/fixtures/app -p 5173 -c-1",
+    "dev": "next dev -p 3100",
+    "dev:next": "next dev -p 3100",
+    "dev:fixture": "http-server tests/e2e/fixtures/app -p 5173 -c-1",
+    "build": "next build",
+    "start": "next start -p 3100",
     "test": "playwright test",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
-    "prepare": "playwright install --with-deps || true"
+    "prepare": "playwright install --with-deps || true",
+    "db:studio": "prisma studio",
+    "db:gen": "prisma generate",
+    "db:reset": "prisma migrate reset --force"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "@playwright/test": "^1.55.0",
-    "@types/node": "^24.3.0",
+    "@types/node": "^24.3.1",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "@types/styled-jsx": "^2.2.9",
     "http-server": "^14.1.1",
+    "prisma": "^6.15.0",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.60.0"
+    "@anthropic-ai/sdk": "^0.60.0",
+    "@prisma/client": "^6.15.0",
+    "next": "^15.5.2",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
   }
 }

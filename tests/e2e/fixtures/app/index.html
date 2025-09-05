@@ -16,6 +16,8 @@
     .ok { color: #0a7f3f; font-weight: 600; }
     .err { color: #b00020; font-weight: 600; }
     .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin: 12px 0; }
+    .field { display: grid; gap: 4px; }
+    .field .hint { font-size: 12px; color: #666; }
   </style>
 </head>
 <body>
@@ -82,22 +84,38 @@
       </div>
     </div>
 
-    <!-- お客様情報 -->
+    <!-- お客様情報（必須／形式エラーの表示を追加） -->
     <div class="row">
       <div class="muted">氏名</div>
-      <input type="text" value="テスト太郎"
-             data-test="customer-name" data-test-customer-name />
+      <div class="field">
+        <input type="text" value="テスト太郎"
+               data-test="customer-name" data-test-customer-name
+               aria-describedby="err-name" />
+        <div id="err-name"
+             class="err hidden"
+             data-test="error-name">必須</div>
+      </div>
     </div>
     <div class="row">
       <div class="muted">メール</div>
-      <input type="email" value="test@example.com"
-             data-test="customer-email" data-test-customer-email />
+      <div class="field">
+        <input type="email" value="test@example.com"
+               data-test="customer-email" data-test-customer-email
+               aria-describedby="err-email" />
+        <div id="err-email"
+             class="err hidden"
+             data-test="error-email">メール形式エラー</div>
+      </div>
     </div>
     <div class="row">
       <div class="muted">電話</div>
       <input type="tel" value="+81901234567"
              data-test="customer-phone" data-test-customer-phone />
     </div>
+
+    <!-- 入力エラーバナー（入力に誤り） -->
+    <div id="inputError" class="err hidden"
+         data-test="error-banner">入力に誤りがあります</div>
 
     <!-- 簡易的な支払い UI（テスト用の疑似挙動） -->
     <div class="card">
@@ -159,12 +177,16 @@
         payBtn: document.querySelector('[data-test="pay-button"]'),
         payOk: document.getElementById('payOk'),
         payErr: document.getElementById('payError'),
+        inputErr: document.getElementById('inputError'),
+        errName: document.querySelector('[data-test="error-name"]'),
+        errEmail: document.querySelector('[data-test="error-email"]'),
         debug: document.getElementById('debug')
       };
 
       let state = {
         date: null,
-        slot: null
+        slot: null,
+        valid: false
       };
 
       // カレンダー表示切替
@@ -202,8 +224,41 @@
         el.inputs[k].addEventListener('input', render);
       });
 
+      // 入力バリデーション
+      function validate() {
+        const name = (el.inputs.name.value || '').trim();
+        const email = (el.inputs.email.value || '').trim();
+
+        const nameOk = name.length > 0;
+        const emailOk = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
+
+        // フィールド別エラー表示
+        toggle(el.errName, !nameOk);
+        toggle(el.errEmail, nameOk && !emailOk); // 氏名が空ならまず氏名エラーを優先
+
+        // 入力エラーバナー（任意条件：氏名/メールのどちらかNG）
+        const anyInputError = !nameOk || !emailOk;
+        toggle(el.inputErr, anyInputError);
+
+        // 送信可能条件（例）：日付・時間帯が選択済み、人数が1以上、氏名/メールOK
+        const amt = calcAmount();
+        state.valid = !!(state.date && state.slot && amt > 0 && nameOk && emailOk);
+
+        // ボタン disabled
+        el.payBtn.toggleAttribute('disabled', !state.valid);
+      }
+
       // 決済ボタン
       el.payBtn.addEventListener('click', () => {
+        // 入力検証を最終確認
+        validate();
+        if (!state.valid) {
+          // 入力に誤りがあるときは決済しない
+          el.payOk.classList.add('hidden');
+          el.payErr.classList.add('hidden');
+          return;
+        }
+
         el.payOk.classList.add('hidden');
         el.payErr.classList.add('hidden');
 
@@ -216,6 +271,12 @@
         }
         // 成功
         el.payOk.classList.remove('hidden');
+      });
+
+      // 入力欄の blur/input でバリデーション反映
+      ['name','email'].forEach(key => {
+        el.inputs[key].addEventListener('input', () => { validate(); render(); });
+        el.inputs[key].addEventListener('blur',  () => { validate(); render(); });
       });
 
       function calcAmount() {
@@ -234,10 +295,17 @@
         el.amount.textContent = '¥' + amt.toLocaleString('ja-JP');
 
         el.debug.textContent =
-          `date=${state.date || '-'} / slot=${state.slot || '-'} / amount=${amt}`;
+          `date=${state.date || '-'} / slot=${state.slot || '-'} / amount=${amt} / valid=${state.valid}`;
       }
 
+      function toggle(node, show) {
+        if (!node) return;
+        node.classList.toggle('hidden', !show);
+      }
+
+      // 初期描画＆初期検証
       render();
+      validate();
     })();
   </script>
 </body>

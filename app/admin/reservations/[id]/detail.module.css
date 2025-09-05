@@ -1,0 +1,41 @@
+.title {
+    font-weight: 900;
+    margin: 0 0 14px;
+  }
+  
+  .card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+  
+  .meta {
+    color: #64748b;
+    font-size: 13px;
+  }
+  
+  .error {
+    color: #b91c1c;
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+    padding: 10px;
+    border-radius: 10px;
+  }
+  
+  .actions {
+    display: flex;
+    gap: 8px;
+  }
+  .actions button {
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    cursor: pointer;
+  }
+  .actions button:hover {
+    background: #f1f5f9;
+  }
+  

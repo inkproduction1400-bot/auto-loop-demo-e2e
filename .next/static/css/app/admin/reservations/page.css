@@ -1,0 +1,120 @@
+/*!**********************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[14].oneOf[5].use[2]!./node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[14].oneOf[5].use[3]!./app/admin/reservations/page.module.css ***!
+  \**********************************************************************************************************************************************************************************************************************************************************************************/
+/* app/admin/reservations/page.module.css */
+.page_title__I9XI_ {
+    font-weight: 900;
+    margin: 0 0 14px;
+  }
+  
+  .page_toolbar__MVZUe {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 10px;
+    margin-bottom: 10px;
+  }
+  .page_toolbar__MVZUe input,
+  .page_toolbar__MVZUe select,
+  .page_toolbar__MVZUe button {
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 8px 10px;
+    background: #fff;
+  }
+  .page_toolbar__MVZUe button {
+    background: #2563eb;
+    color: #fff;
+    border-color: #2563eb;
+  }
+  
+  .page_meta__clYRu {
+    color: #64748b;
+    font-size: 13px;
+    margin: 6px 0 10px;
+  }
+  
+  .page_error__OTsdL {
+    color: #b91c1c;
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-weight: 700;
+    margin: 8px 0;
+  }
+  
+  .page_tableWrap__EqxdP {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    overflow: auto;
+  }
+  .page_table__fo9_Z {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .page_table__fo9_Z th,
+  .page_table__fo9_Z td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: top;
+  }
+  .page_table__fo9_Z th {
+    text-align: left;
+    background: #f8fafc;
+    font-size: 13px;
+    color: #64748b;
+  }
+  
+  .page_muted__OWUi0 {
+    color: #64748b;
+    font-size: 12px;
+  }
+  
+  .page_chip__sKzwu {
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    border: 1px solid #cbd5e1;
+  }
+  .page_chip_paid__jVo4J {
+    background: #ecfdf5;
+    border-color: #bbf7d0;
+    color: #0f766e;
+  }
+  .page_chip_pending__VUnyL {
+    background: #fff7ed;
+    border-color: #fed7aa;
+    color: #c2410c;
+  }
+  .page_chip_cancelled__OW8TY {
+    background: #fee2e2;
+    border-color: #fecaca;
+    color: #b91c1c;
+  }
+  
+  .page_pager__JYAaQ {
+    display: flex;
+    gap: 6px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+  .page_pagebtn__kz4AP {
+    padding: 6px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #fff;
+    text-decoration: none;
+    color: #0f172a;
+  }
+  .page_active__qvc2W {
+    background: #eef2ff;
+    border-color: #c7d2fe;
+    font-weight: 800;
+  }
+  

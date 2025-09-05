@@ -1,0 +1,59 @@
+/* app/admin/customers/customers.module.css */
+.title {
+  font-weight: 900;
+  margin: 0 0 14px;
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+.toolbar input, .toolbar button {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #fff;
+}
+
+.toolbar button {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}
+
+.meta { color: #64748b; font-size: 13px; margin: 6px 0 10px; }
+.error { color: #dc2626; font-weight: 800; margin-top: 8px; }
+
+.tableWrap {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: auto;
+}
+
+.table { width: 100%; border-collapse: collapse; }
+.table th, .table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: top;
+}
+.table th { text-align: left; background: #f8fafc; font-size: 13px; color: #64748b; }
+
+.pager { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+.pagebtn {
+  padding: 6px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  text-decoration: none;
+  color: #0f172a;
+}
+.active { background: #eef2ff; border-color: #c7d2fe; font-weight: 800; }
