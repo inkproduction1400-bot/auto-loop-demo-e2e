@@ -26,7 +26,7 @@ jobs:
         project: [chromium, firefox, webkit]
       max-parallel: 3
 
-    # ✅ ここで Job 全体に Stripe/BASE_URL を注入（Playwright → webServer にも伝搬）
+    # ✅ Job 全体に Stripe/BASE_URL を注入（Playwright → webServer にも伝搬）
     env:
       CI: true
       NEXT_PUBLIC_BASE_URL: "http://localhost:3100"
@@ -48,6 +48,13 @@ jobs:
 
       - name: Install Playwright browsers & deps
         run: npx playwright install --with-deps
+
+      # 🔎 環境変数の健全性チェック（値は出さない）
+      - name: Sanity check env (no secret values)
+        run: |
+          if [ -n "${STRIPE_SECRET_KEY}" ]; then echo "STRIPE_SECRET_KEY: set"; else echo "STRIPE_SECRET_KEY: MISSING"; fi
+          if [ -n "${STRIPE_PUBLISHABLE_KEY}" ]; then echo "STRIPE_PUBLISHABLE_KEY: set"; else echo "STRIPE_PUBLISHABLE_KEY: MISSING"; fi
+          echo "BASE_URL: ${NEXT_PUBLIC_BASE_URL:-<none>}"
 
       # config 側で reporter=[blob,junit]（HTMLはここでは生成しない）
       - name: Run tests (${{ matrix.project }})
@@ -79,7 +86,7 @@ jobs:
     if: ${{ always() && github.ref == 'refs/heads/main' }}
     timeout-minutes: 20
 
-    # ★ これが必須：GitHub Pages 用の environment を指定
+    # ★ GitHub Pages 用 environment（必須）
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
