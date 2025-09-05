@@ -1,4 +1,3 @@
-// tests/e2e/fixtures/ReservationWidget.ts
 import { Page, Locator, expect } from '@playwright/test';
 
 export interface AttendeeInput {
@@ -26,6 +25,7 @@ export interface CardInput {
  * - data-test セレクタ契約を一元管理
  * - Validation / Flow 両系テストから共通利用できる API を提供
  * - Validation 実装の差異に耐えるよう、エラー系セレクタは幅広く対応
+ * - Firefox / WebKit でも落ちづらいよう、明示 wait と再試行を実装
  */
 export class ReservationWidget {
   constructor(private page: Page) {}
@@ -92,46 +92,85 @@ export class ReservationWidget {
       bookingConfirmed: p.locator('[data-test="booking-confirmed"], [data-test="reservation-complete"]'),
 
       // ===== フィールド別エラー =====
-      // フィールドに応じ、よくある命名を片っ端からフォールバック
       errorOf: (field: string) =>
         p.locator(
           [
-            // 既存契約
             `[data-test="error-${field}"]`,
             `[data-error-for="${field}"]`,
             `.error-${field}`,
-
-            // よくある派生（customer- 前置 / input- 前置 / -error 後置 / id）
             `[data-test="${field}-error"]`,
             `[id$="${field}-error" i]`,
             `[id^="${field}Error" i]`,
             `[data-test="customer-${field}-error"]`,
             `[data-test="input-${field}-error"]`,
-
-            // data-field での指定
             `[role="alert"][data-field="${field}"]`,
             `[aria-live][data-field="${field}"]`,
-
-            // label/aria-describedby 経由（ラベル直後の .error など）
             `#${field}, [name="${field}"] ~ .error, #${field}-error, .${field}-error`,
           ].join(', ')
         ),
     };
   }
 
-  // ===== ユーティリティ =====
+  // ====== 汎用ユーティリティ（安定化） ======
   private async exists(loc: Locator): Promise<boolean> {
     return (await loc.count()) > 0;
   }
-  private async ensureCalendarOpen() {
-    if (!(await this.exists(this.s.datePicker))) return; // そもそも無ければ何もしない
-    if (await this.s.calendar.isHidden()) {
-      await this.s.datePicker.click().catch(() => {});
-      if (await this.exists(this.s.calendar)) {
-        await expect(this.s.calendar).toBeVisible();
+
+  private async waitVisible(loc: Locator, timeout = 8000) {
+    if (await this.exists(loc)) {
+      await loc.waitFor({ state: 'visible', timeout }).catch(() => {});
+    }
+  }
+
+  private async waitAttached(loc: Locator, timeout = 8000) {
+    if (await this.exists(loc)) {
+      await loc.waitFor({ state: 'attached', timeout }).catch(() => {});
+    }
+  }
+
+  /** クリック再試行（重なり/アニメーションでの取りこぼし対策） */
+  private async clickWithRetry(loc: Locator, tries = 2) {
+    for (let i = 0; i < tries; i++) {
+      try {
+        await loc.scrollIntoViewIfNeeded().catch(() => {});
+        await loc.click({ trial: true }).catch(() => {});
+        await loc.click();
+        return;
+      } catch {
+        if (i === tries - 1) throw new Error('clickWithRetry: failed');
+        await this.page.waitForTimeout(250);
       }
     }
   }
+
+  /** 開いていなければ datePicker を押して calendar が visible になるまで待つ */
+  private async ensureCalendarOpen() {
+    if (!(await this.exists(this.s.datePicker))) return;
+    // 既に visible なら何もしない
+    if (await this.exists(this.s.calendar)) {
+      if (await this.s.calendar.isVisible()) return;
+    }
+    // 開く
+    await this.clickWithRetry(this.s.datePicker);
+    await this.waitVisible(this.s.calendar, 8000);
+  }
+
+  /** 開いていたら閉じる（Esc → datePickerクリックの順で試みる） */
+  private async ensureCalendarClosed() {
+    if (!(await this.exists(this.s.datePicker))) return;
+    if (!(await this.exists(this.s.calendar))) return;
+    if (await this.s.calendar.isHidden()) return;
+
+    // Esc で閉じる UI の場合
+    await this.page.keyboard.press('Escape').catch(() => {});
+    await this.page.waitForTimeout(50);
+    if (await this.s.calendar.isHidden()) return;
+
+    // まだ見えていればトグル
+    await this.clickWithRetry(this.s.datePicker);
+    await this.s.calendar.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+  }
+
   private addDays(dt: Date, days: number) {
     const d = new Date(dt);
     d.setDate(d.getDate() + days);
@@ -149,9 +188,13 @@ export class ReservationWidget {
 
   // ===== 初期化待ち =====
   async waitForWidget() {
+    // ページロードの安定待ち
+    await this.page.waitForLoadState('domcontentloaded').catch(() => {});
+    await this.page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
+    // ウィジェット可視化 or ロードフラグ
     await Promise.race([
-      this.s.container.waitFor({ state: 'visible' }),
-      this.s.loadedFlag.waitFor({ state: 'visible' }).catch(() => {}),
+      this.s.container.waitFor({ state: 'visible', timeout: 8000 }).catch(() => {}),
+      this.s.loadedFlag.waitFor({ state: 'visible', timeout: 8000 }).catch(() => {}),
     ]);
   }
 
@@ -160,24 +203,20 @@ export class ReservationWidget {
     // カレンダー UI が無ければスキップ
     if (!(await this.exists(this.s.datePicker))) return;
 
-    // 開く
+    // 開く→対象セルを待ってクリック→閉じる
     await this.ensureCalendarOpen();
     if (!(await this.exists(this.s.calendar))) return;
 
-    // 対象日があればクリック
     const btn = this.s.dateBtn(iso).first();
+    await this.waitAttached(btn, 8000);
     if (await this.exists(btn)) {
-      await btn.click().catch(() => {});
+      await this.clickWithRetry(btn);
     }
 
-    // 閉じる（開いていれば）
-    if (await this.s.calendar.isVisible()) {
-      await this.s.datePicker.click().catch(() => {});
-    }
+    await this.ensureCalendarClosed();
   }
 
   async pickDatePlusDays(days: number) {
-    // カレンダー UI が無いページ（Validation）では何もしない
     if (!(await this.exists(this.s.datePicker))) return;
     const target = this.formatDate(this.addDays(new Date(), days));
     await this.selectDate(target);
@@ -186,38 +225,43 @@ export class ReservationWidget {
   /** 指定日が無効（日付ボタンに data-test-disabled="true"）かを返す */
   async isDateDisabled(iso: string): Promise<boolean> {
     if (!(await this.exists(this.s.datePicker))) return false;
+
     await this.ensureCalendarOpen();
+
     const el = this.s.dateBtnRaw(iso).first();
+    await this.waitAttached(el, 3000);
+
+    // ボタンが存在しなければ「選べない」とみなす
     if (!(await this.exists(el))) {
-      // ボタン自体が存在しない場合は「選べない」とみなす
-      if (await this.s.calendar.isVisible()) {
-        await this.s.datePicker.click().catch(() => {});
-      }
+      await this.ensureCalendarClosed();
       return true;
     }
+
     const attr = await el.getAttribute('data-test-disabled');
-    if (await this.s.calendar.isVisible()) {
-      await this.s.datePicker.click().catch(() => {});
-    }
-    return attr === 'true' || (await el.isDisabled());
+    const disabled = attr === 'true' || (await el.isDisabled());
+
+    await this.ensureCalendarClosed();
+    return disabled;
   }
 
   async selectTimeSlot(slot: string) {
     if (!(await this.exists(this.s.timeGroup))) return;
-    await this.s.timeGroup.waitFor({ state: 'visible' }).catch(() => {});
+    await this.waitVisible(this.s.timeGroup, 8000);
+
     const btn = this.s.slotBtn(slot).first();
+    await this.waitAttached(btn, 5000);
     if (await this.exists(btn)) {
-      await btn.click().catch(() => {});
+      await this.clickWithRetry(btn);
     }
   }
 
   // ===== 人数 =====
   async inputAttendees(a: AttendeeInput) {
-    if (a.adult != null) await this.s.adult.fill(String(a.adult));
+    if (a.adult != null)   await this.s.adult.fill(String(a.adult));
     if (a.student != null) await this.s.student.fill(String(a.student));
     const childVal = a.child != null ? a.child : a.child1;
-    if (childVal != null) await this.s.child.fill(String(childVal));
-    if (a.infant != null) await this.s.infant.fill(String(a.infant));
+    if (childVal != null)  await this.s.child.fill(String(childVal));
+    if (a.infant != null)  await this.s.infant.fill(String(a.infant));
   }
 
   // ===== お客様情報 =====
@@ -244,7 +288,7 @@ export class ReservationWidget {
 
     await this.s.cardNumber.fill(payload.number);
     if (await this.exists(this.s.cardExpiry)) await this.s.cardExpiry.fill(payload.expiry!);
-    if (await this.exists(this.s.cardCvc)) await this.s.cardCvc.fill(payload.cvc!);
+    if (await this.exists(this.s.cardCvc))    await this.s.cardCvc.fill(payload.cvc!);
 
     const btn = this.s.submit.first();
     await btn.scrollIntoViewIfNeeded().catch(() => {});
@@ -253,7 +297,7 @@ export class ReservationWidget {
       await btn.click({ trial: true }).catch(() => {});
       return;
     }
-    await btn.click().catch(() => {});
+    await this.clickWithRetry(btn);
   }
 
   // ===== 参照系 =====
