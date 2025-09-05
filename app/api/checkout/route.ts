@@ -2,48 +2,52 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-// CI などで外部アクセスを抑止してモック返しを強制するフラグ
-const E2E_STRIPE_MOCK = process.env.E2E_STRIPE_MOCK === '1';
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY ?? '';
+const BASE =
+  (process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3100').replace(/\/+$/, '');
 
-// Next.js App Router でも Node ランタイムを明示
-export const runtime = 'nodejs';
+// ── ヘルパ
+function jsonError(message: string, status = 500) {
+  return NextResponse.json({ error: message }, { status });
+}
 
-// 型
-type CreateCheckoutInput = {
-  amount?: number;        // 例: 1000 = ¥1,000
-  currency?: string;      // 例: 'jpy'
-  description?: string;
-  metadata?: Record<string, unknown>;
-};
-
+// POST /api/checkout
+// E2E_STRIPE_MOCK=1 のときは Stripe を呼ばず「見た目だけそれっぽいURL」を返す
 export async function POST(req: Request) {
-  // まずはボディを安全に読む
-  const bodyTxt = await req.text();
-  const body = (bodyTxt ? JSON.parse(bodyTxt) : {}) as CreateCheckoutInput;
-
-  // 金額などを丸めて最低金額ガード
-  const amount = normalizeAmount(body.amount);
-  const currency = (body.currency ?? 'jpy').toLowerCase();
-  const description = body.description ?? 'Reservation Fee';
-  const metadata = toStringRecord({
-    ...(body.metadata ?? {}),
-    via: 'e2e',
-  });
-
-  // CI ではモック返し（外部通信なし）
-  if (E2E_STRIPE_MOCK || !STRIPE_SECRET_KEY) {
+  // 1) モック（CI/ローカル切り替え）
+  if (process.env.E2E_STRIPE_MOCK === '1') {
     const mockUrl =
-      'https://checkout.stripe.com/pay/cs_test_mock_' +
-      Math.random().toString(36).slice(2);
+      'https://checkout.stripe.com/pay/cs_test_mock_' + Math.random().toString(36).slice(2);
     return NextResponse.json({ url: mockUrl });
   }
 
-  // ここから実 Stripe（テストキー）
-  try {
-    const stripe = new Stripe(STRIPE_SECRET_KEY, {
-    });
+  // 2) 実 Stripe（テストキー）呼び出し
+  if (!STRIPE_SECRET_KEY) return jsonError('Missing STRIPE_SECRET_KEY on server', 500);
 
+  // ★ここがポイント：短縮形ではなく、値を直接入れる
+  const stripe = new Stripe(STRIPE_SECRET_KEY, {
+    apiVersion: (Stripe as any).LATEST_API_VERSION, // 最新に追従
+  });
+
+  // リクエスト body（壊れていたら既定値で続行）
+  let body: any = {};
+  try {
+    body = await req.json();
+  } catch {
+    body = {};
+  }
+
+  const amount =
+    Number.isFinite(body?.amount) && body.amount > 0 ? Math.round(Number(body.amount)) : 1000; // 既定: ¥1,000
+  const currency = (body?.currency ?? 'jpy').toLowerCase();
+  const metadata: Record<string, string> =
+    body?.metadata && typeof body.metadata === 'object'
+      ? Object.fromEntries(
+          Object.entries(body.metadata).map(([k, v]) => [k, typeof v === 'string' ? v : JSON.stringify(v)]),
+        )
+      : { via: 'e2e' };
+
+  try {
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],
@@ -57,52 +61,15 @@ export async function POST(req: Request) {
           quantity: 1,
         },
       ],
-      success_url: process.env.NEXT_PUBLIC_BASE_URL
-        ? `${stripTrailingSlash(process.env.NEXT_PUBLIC_BASE_URL)}/?status=success`
-        : 'http://localhost:3100/?status=success',
-      cancel_url: process.env.NEXT_PUBLIC_BASE_URL
-        ? `${stripTrailingSlash(process.env.NEXT_PUBLIC_BASE_URL)}/?status=cancel`
-        : 'http://localhost:3100/?status=cancel',
+      // 成功/キャンセル遷移先（必要に応じて変更）
+      success_url: `${BASE}/?paid=1`,
+      cancel_url: `${BASE}/?canceled=1`,
       metadata,
     });
 
     return NextResponse.json({ url: session.url });
-  } catch (err: unknown) {
-    // 失敗時も HTML ではなく JSON を返す（テストがパース可能）
-    return NextResponse.json(
-      {
-        error: 'Failed to create Stripe Checkout session',
-        detail: (err as Error)?.message,
-      },
-      { status: 500 }
-    );
+  } catch (err: any) {
+    console.error('Stripe error:', err);
+    return jsonError(err?.message ?? 'Stripe API failed', 500);
   }
-}
-
-// GET で叩かれても 405 等にせず JSON 返す（誤爆時の見やすさ重視）
-export async function GET() {
-  return NextResponse.json(
-    { error: 'Use POST /api/checkout' },
-    { status: 405 }
-  );
-}
-
-// ===== helpers =====
-function normalizeAmount(v?: number) {
-  const n = typeof v === 'string' ? Number(v) : v;
-  if (!Number.isFinite(n)) return 1000;
-  return Math.max(50, Math.round(n!)); // 最低 50 を保証
-}
-
-function stripTrailingSlash(s: string) {
-  return s.replace(/\/+$/, '');
-}
-
-function toStringRecord(
-  obj?: Record<string, unknown>
-): Record<string, string> | undefined {
-  if (!obj) return undefined;
-  return Object.fromEntries(
-    Object.entries(obj).map(([k, v]) => [k, typeof v === 'string' ? v : JSON.stringify(v)])
-  );
 }
