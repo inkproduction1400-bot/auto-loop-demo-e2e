@@ -1,0 +1,92 @@
+<testsuites id="" name="" tests="36" failures="0" skipped="0" errors="0" time="85.769402">
+<testsuite name="reservation-flow.spec.ts" timestamp="2025-09-08T03:50:15.809Z" hostname="chromium" tests="7" failures="0" skipped="0" time="78.004" errors="0">
+<testcase name="Reservation Flow - Normal › E2E-001: Basic reservation completes" classname="reservation-flow.spec.ts" time="20.996">
+</testcase>
+<testcase name="Reservation Flow - Normal › E2E-002: Mixed attendees calculates total" classname="reservation-flow.spec.ts" time="19.908">
+</testcase>
+<testcase name="Reservation Flow - Normal › E2E-004: 90 days advance reservation allowed" classname="reservation-flow.spec.ts" time="15.719">
+</testcase>
+<testcase name="Reservation Flow - Normal › Reservation Flow - Errors › E2E-008: 91 days advance is disabled" classname="reservation-flow.spec.ts" time="0.874">
+</testcase>
+<testcase name="Reservation Flow - Normal › Reservation Flow - Errors › E2E-010: Payment decline shows error" classname="reservation-flow.spec.ts" time="20.013">
+</testcase>
+<testcase name="Payment via Stripe Checkout › E2E-020: Stripe Checkout success" classname="reservation-flow.spec.ts" time="0.245">
+</testcase>
+<testcase name="Payment via Stripe Checkout › E2E-021: Stripe Checkout decline shows error" classname="reservation-flow.spec.ts" time="0.249">
+</testcase>
+</testsuite>
+<testsuite name="reservation-flow.stripe.spec.ts" timestamp="2025-09-08T03:50:15.809Z" hostname="chromium" tests="2" failures="0" skipped="0" time="1.048" errors="0">
+<testcase name="Payment via Stripe Checkout (Mock UI) › E2E-020: Stripe Checkout success" classname="reservation-flow.stripe.spec.ts" time="0.67">
+</testcase>
+<testcase name="Payment via Stripe Checkout (Mock UI) › E2E-021: Stripe Checkout decline shows error" classname="reservation-flow.stripe.spec.ts" time="0.378">
+</testcase>
+</testsuite>
+<testsuite name="validation.spec.ts" timestamp="2025-09-08T03:50:15.809Z" hostname="chromium" tests="3" failures="0" skipped="0" time="1.668" errors="0">
+<testcase name="Validation › 空欄では予約できない" classname="validation.spec.ts" time="0.909">
+</testcase>
+<testcase name="Validation › メール形式エラー" classname="validation.spec.ts" time="0.57">
+</testcase>
+<testcase name="Validation › エラーメッセージUI" classname="validation.spec.ts" time="0.189">
+</testcase>
+</testsuite>
+<testsuite name="reservation-flow.spec.ts" timestamp="2025-09-08T03:50:15.809Z" hostname="firefox" tests="7" failures="0" skipped="0" time="79.189" errors="0">
+<testcase name="Reservation Flow - Normal › E2E-001: Basic reservation completes" classname="reservation-flow.spec.ts" time="22.009">
+</testcase>
+<testcase name="Reservation Flow - Normal › E2E-002: Mixed attendees calculates total" classname="reservation-flow.spec.ts" time="19.83">
+</testcase>
+<testcase name="Reservation Flow - Normal › E2E-004: 90 days advance reservation allowed" classname="reservation-flow.spec.ts" time="15.732">
+</testcase>
+<testcase name="Reservation Flow - Normal › Reservation Flow - Errors › E2E-008: 91 days advance is disabled" classname="reservation-flow.spec.ts" time="0.937">
+</testcase>
+<testcase name="Reservation Flow - Normal › Reservation Flow - Errors › E2E-010: Payment decline shows error" classname="reservation-flow.spec.ts" time="20.006">
+</testcase>
+<testcase name="Payment via Stripe Checkout › E2E-020: Stripe Checkout success" classname="reservation-flow.spec.ts" time="0.344">
+</testcase>
+<testcase name="Payment via Stripe Checkout › E2E-021: Stripe Checkout decline shows error" classname="reservation-flow.spec.ts" time="0.331">
+</testcase>
+</testsuite>
+<testsuite name="reservation-flow.stripe.spec.ts" timestamp="2025-09-08T03:50:15.809Z" hostname="firefox" tests="2" failures="0" skipped="0" time="1.716" errors="0">
+<testcase name="Payment via Stripe Checkout (Mock UI) › E2E-020: Stripe Checkout success" classname="reservation-flow.stripe.spec.ts" time="1.175">
+</testcase>
+<testcase name="Payment via Stripe Checkout (Mock UI) › E2E-021: Stripe Checkout decline shows error" classname="reservation-flow.stripe.spec.ts" time="0.541">
+</testcase>
+</testsuite>
+<testsuite name="validation.spec.ts" timestamp="2025-09-08T03:50:15.809Z" hostname="firefox" tests="3" failures="0" skipped="0" time="2.414" errors="0">
+<testcase name="Validation › 空欄では予約できない" classname="validation.spec.ts" time="1.57">
+</testcase>
+<testcase name="Validation › メール形式エラー" classname="validation.spec.ts" time="0.559">
+</testcase>
+<testcase name="Validation › エラーメッセージUI" classname="validation.spec.ts" time="0.285">
+</testcase>
+</testsuite>
+<testsuite name="reservation-flow.spec.ts" timestamp="2025-09-08T03:50:15.809Z" hostname="webkit" tests="7" failures="0" skipped="0" time="79.122" errors="0">
+<testcase name="Reservation Flow - Normal › E2E-001: Basic reservation completes" classname="reservation-flow.spec.ts" time="21.054">
+</testcase>
+<testcase name="Reservation Flow - Normal › E2E-002: Mixed attendees calculates total" classname="reservation-flow.spec.ts" time="19.999">
+</testcase>
+<testcase name="Reservation Flow - Normal › E2E-004: 90 days advance reservation allowed" classname="reservation-flow.spec.ts" time="15.986">
+</testcase>
+<testcase name="Reservation Flow - Normal › Reservation Flow - Errors › E2E-008: 91 days advance is disabled" classname="reservation-flow.spec.ts" time="0.982">
+</testcase>
+<testcase name="Reservation Flow - Normal › Reservation Flow - Errors › E2E-010: Payment decline shows error" classname="reservation-flow.spec.ts" time="20.347">
+</testcase>
+<testcase name="Payment via Stripe Checkout › E2E-020: Stripe Checkout success" classname="reservation-flow.spec.ts" time="0.375">
+</testcase>
+<testcase name="Payment via Stripe Checkout › E2E-021: Stripe Checkout decline shows error" classname="reservation-flow.spec.ts" time="0.379">
+</testcase>
+</testsuite>
+<testsuite name="reservation-flow.stripe.spec.ts" timestamp="2025-09-08T03:50:15.809Z" hostname="webkit" tests="2" failures="0" skipped="0" time="1.184" errors="0">
+<testcase name="Payment via Stripe Checkout (Mock UI) › E2E-020: Stripe Checkout success" classname="reservation-flow.stripe.spec.ts" time="0.695">
+</testcase>
+<testcase name="Payment via Stripe Checkout (Mock UI) › E2E-021: Stripe Checkout decline shows error" classname="reservation-flow.stripe.spec.ts" time="0.489">
+</testcase>
+</testsuite>
+<testsuite name="validation.spec.ts" timestamp="2025-09-08T03:50:15.809Z" hostname="webkit" tests="3" failures="0" skipped="0" time="1.495" errors="0">
+<testcase name="Validation › 空欄では予約できない" classname="validation.spec.ts" time="0.619">
+</testcase>
+<testcase name="Validation › メール形式エラー" classname="validation.spec.ts" time="0.612">
+</testcase>
+<testcase name="Validation › エラーメッセージUI" classname="validation.spec.ts" time="0.264">
+</testcase>
+</testsuite>
+</testsuites>

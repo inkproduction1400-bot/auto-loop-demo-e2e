@@ -1,4 +1,4 @@
-import ReservationWidget from '@/components/ReservationWidget'
+import ReservationWidget from '@/components/ReservationWidget'; // ← tsconfig の "@/*": ["./src/*"] と整合
 
 export default function Home() {
   return (
@@ -8,5 +8,5 @@ export default function Home() {
         <ReservationWidget />
       </div>
     </main>
-  )
+  );
 }

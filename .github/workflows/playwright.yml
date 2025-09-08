@@ -9,6 +9,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  pull-requests: write   # ← 追加：PRコメント投稿に必要
 
 # Pages 競合回避
 concurrency:
@@ -19,21 +20,20 @@ jobs:
   test:
     name: Run E2E on ${{ matrix.project }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
         project: [chromium, firefox, webkit]
       max-parallel: 3
 
-    # ✅ Job 全体に Stripe/BASE_URL を注入（Next の webServer へも伝搬）
     env:
       CI: true
-      NEXT_PUBLIC_BASE_URL: "http://localhost:3100"
+      NEXT_PUBLIC_BASE_URL: "http://127.0.0.1:3100"
+      PW_BASE_URL: "http://127.0.0.1:3100"
+      E2E_STRIPE_MOCK: "1"
       STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
       STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
-      # ✅ CI では常にモック応答（実 Stripe 呼び出しはしない）
-      E2E_STRIPE_MOCK: "1"
 
     steps:
       - name: Checkout
@@ -48,19 +48,42 @@ jobs:
       - name: Install deps
         run: npm ci
 
+      - name: Build Next.js
+        run: npm run build
+
       - name: Install Playwright browsers & deps
         run: npx playwright install --with-deps
 
-      # config 側で reporter=[list,junit,blob]（HTMLはここでは生成しない）
-      - name: Run tests (${{ matrix.project }})
-        run: npx playwright test --project="${{ matrix.project }}" --workers=1
+      # --- 軽量実行（デバッグ無効） ---
+      - name: Run tests (fast) ${{ matrix.project }}
+        run: >
+          npx playwright test
+          --project="${{ matrix.project }}"
+          --workers=1
+          --reporter=list,junit,blob
+          --output=test-results/${{ matrix.project }}/blob-report
+        env:
+          E2E_DEBUG: "0"
+
+      # --- 失敗時に詳細リトライ ---
+      - name: Retry with debug trace ${{ matrix.project }}
+        if: failure()
+        run: >
+          npx playwright test
+          --project="${{ matrix.project }}"
+          --workers=1
+          --retries=1
+          --reporter=list,junit,blob
+          --output=test-results/${{ matrix.project }}/blob-report
+        env:
+          E2E_DEBUG: "2"
 
       - name: Upload blob report (per-project)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: blob-report-${{ matrix.project }}
-          path: blob-report
+          name: blob-${{ matrix.project }}
+          path: test-results/${{ matrix.project }}/blob-report
           if-no-files-found: error
           retention-days: 7
 
@@ -69,7 +92,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: junit-${{ matrix.project }}
-          path: test-results/junit.xml
+          path: test-results/${{ matrix.project }}/junit.xml
           if-no-files-found: warn
           retention-days: 30
 
@@ -77,11 +100,9 @@ jobs:
     name: Publish combined HTML report to GitHub Pages
     needs: [test]
     runs-on: ubuntu-latest
-    # テストが失敗しても HTML を公開してデバッグ可能に
     if: ${{ always() && github.ref == 'refs/heads/main' }}
     timeout-minutes: 20
 
-    # GitHub Pages 用の environment（必須）
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -101,12 +122,12 @@ jobs:
       - name: Download all blob reports
         uses: actions/download-artifact@v4
         with:
-          pattern: blob-report-*
-          path: ./blob-reports
+          pattern: blob-*
+          path: ./test-results/blobs
           merge-multiple: true
 
       - name: Merge to single HTML report
-        run: npx playwright merge-reports --reporter html ./blob-reports
+        run: npx playwright merge-reports --reporter html ./test-results/blobs
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -119,3 +140,27 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      # === 追加：実行サマリー/PRコメントにレポートリンクを掲示 ===
+      - name: Add link to job summary
+        if: always()
+        run: |
+          echo "### Playwright HTML Report" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "👉 **${{ steps.deployment.outputs.page_url }}**" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment on PR with report link
+        if: ${{ github.event_name == 'pull_request' && always() }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const url = "${{ steps.deployment.outputs.page_url }}";
+            if (!url) return; // main 以外では未発行
+            const body = `🧪 **Playwright Report**\n\n🔗 ${url}`;
+            const { context, github } = require('@actions/github');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body
+            });

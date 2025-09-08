@@ -1,7 +1,7 @@
 // app/admin/reservations/page.tsx
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import styles from './page.module.css';
@@ -37,7 +37,20 @@ function intOr(sp: URLSearchParams, key: string, fallback: number) {
   return Number.isFinite(v) && v > 0 ? v : fallback;
 }
 
-export default function ReservationsPage() {
+/**
+ * ページのエクスポートは Suspense で中身をラップする。
+ * これで `useSearchParams()` 使用時のビルドエラーが解消されます。
+ */
+export default function ReservationsPageWrapper() {
+  return (
+    <Suspense fallback={<div className={styles.meta}>読み込み中…</div>}>
+      <ReservationsPageInner />
+    </Suspense>
+  );
+}
+
+/** 実際の画面本体（ここで useSearchParams を使う） */
+function ReservationsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -155,7 +168,7 @@ export default function ReservationsPage() {
                   <th>金額</th>
                   <th>顧客</th>
                   <th>状態</th>
-                  <th>詳細</th>{/* ← 追加 */}
+                  <th>詳細</th>
                 </tr>
               </thead>
               <tbody>
@@ -186,7 +199,6 @@ export default function ReservationsPage() {
                         </span>
                       </td>
                       <td>
-                        {/* ← ここを追加：詳細ページへのリンク */}
                         <Link href={`/admin/reservations/${r.id}`}>詳細</Link>
                       </td>
                     </tr>
