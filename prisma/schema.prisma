@@ -1,3 +1,4 @@
+// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,34 +9,39 @@ datasource db {
 }
 
 model Customer {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  phone     String?
-  createdAt DateTime @default(now())
+  id           String        @id @default(cuid())
+  name         String
+  email        String        @unique
+  phone        String?
+  createdAt    DateTime      @default(now())
   reservations Reservation[]
 }
 
 model Reservation {
-  id        String   @id @default(cuid())
-  date      DateTime
-  slot      String
-  counts    Json     // { adult, student, child, infant }
-  amount    Int      // 円
-  status    ReservationStatus @default(PENDING)
-  paymentIntentId String?     // Stripe連携時に使用
-  notes     String?
+  id              String   @id @default(cuid())
+  date            DateTime
+  slot            String
 
-  customer  Customer @relation(fields: [customerId], references: [id])
-  customerId String
+  // Json → 個別カラムに分解（SQLite 対応）
+  adultCount      Int      @default(0)
+  studentCount    Int      @default(0)
+  childCount      Int      @default(0)
+  infantCount     Int      @default(0)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
+  amount          Int      // 円
 
-enum ReservationStatus {
-  PENDING
-  PAID
-  CANCELED
-  FAILED
+  // enum → String（アプリ側では 'PENDING' | 'PAID' | 'CANCELED' | 'FAILED' を使う想定）
+  status          String   @default("PENDING")
+
+  paymentIntentId String?  // Stripe 連携時に使用
+  notes           String?
+
+  customer        Customer @relation(fields: [customerId], references: [id])
+  customerId      String
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([date])
+  @@index([status])
 }
