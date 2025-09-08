@@ -121,7 +121,7 @@ jobs:
           retention-days: 30
 
   publish:
-    name: Publish combined HTML report to GitHub Pages
+    name: Publish dev portal & HTML report to GitHub Pages
     needs: [test]
     runs-on: ubuntu-latest
     if: ${{ always() }}   # 常に起動 → 後段条件で制御
@@ -166,6 +166,73 @@ jobs:
         if: steps.check_blobs.outputs.found == 'true'
         run: npx playwright merge-reports --reporter html ./test-results/blobs
 
+      # === 開発ポータルの生成（README へのリンク＋最新レポート導線）
+      - name: Build Dev Portal (index.html)
+        run: |
+          mkdir -p site
+          cat > site/index.html <<'HTML'
+          <!doctype html>
+          <html lang="ja">
+          <head>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width,initial-scale=1" />
+            <title>auto-loop-demo-e2e – 開発ポータル</title>
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans JP", sans-serif; margin: 0; padding: 24px; line-height: 1.6; color: #111; }
+              header { border-bottom: 1px solid #e5e7eb; margin-bottom: 20px; }
+              h1 { font-size: 28px; margin: 0 0 8px; }
+              .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+              .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; background: #fff; }
+              .muted { color: #6b7280; }
+              a.button { display:inline-block; padding:10px 14px; border-radius:8px; text-decoration:none; border:1px solid #d1d5db; }
+              code { background:#f3f4f6; padding:2px 6px; border-radius:6px; }
+              footer { margin-top: 40px; color:#6b7280; font-size: 12px; }
+            </style>
+          </head>
+          <body>
+            <header>
+              <h1>予約システム E2E – 開発ポータル</h1>
+              <p class="muted">Next.js + Playwright / CI / Stripe モック / レポート公開</p>
+            </header>
+
+            <section class="cards">
+              <div class="card">
+                <h3>ドキュメント（README）</h3>
+                <p>プロジェクトの全体像・開発ルールは README を参照。</p>
+                <p><a class="button" href="https://github.com/${{ github.repository }}/blob/main/README.md" target="_blank" rel="noopener">Open README on GitHub ↗</a></p>
+              </div>
+
+              <div class="card">
+                <h3>最新の E2E レポート</h3>
+                <p>GitHub Actions の実行結果（HTML Report）。</p>
+                <p><a class="button" href="./report/index.html">Open Playwright Report</a></p>
+              </div>
+
+              <div class="card">
+                <h3>ローカル手順（抜粋）</h3>
+                <p><code>npm ci</code> → <code>npm run dev</code> → <code>npx playwright test</code></p>
+                <p class="muted">より詳細は README を参照してください。</p>
+              </div>
+            </section>
+
+            <footer>© ${{ github.repository }} – GitHub Pages</footer>
+          </body>
+          </html>
+          HTML
+
+      # レポートがある時だけ site/report/ に同梱
+      - name: Bundle report into site/
+        if: steps.check_blobs.outputs.found == 'true'
+        run: |
+          mkdir -p site
+          # playwright-report は直下に生成済み（merge-reports）
+          if [ -d "playwright-report" ]; then
+            mkdir -p site/report
+            cp -a playwright-report/. site/report/
+          else
+            echo "::warning:: playwright-report directory not found."
+          fi
+
       # --- main のときだけ Pages 公開（かつ blob がある時だけ）
       - name: Setup Pages
         if: ${{ github.ref == 'refs/heads/main' && steps.check_blobs.outputs.found == 'true' }}
@@ -175,30 +242,30 @@ jobs:
         if: ${{ github.ref == 'refs/heads/main' && steps.check_blobs.outputs.found == 'true' }}
         uses: actions/upload-pages-artifact@v3
         with:
-          path: playwright-report
+          path: site   # ← dev portal + report を同梱
 
       - name: Deploy to GitHub Pages
         id: deployment
         if: ${{ github.ref == 'refs/heads/main' && steps.check_blobs.outputs.found == 'true' }}
         uses: actions/deploy-pages@v4
-        # environment は不要（job レベルで付けない）
 
       # === 実行サマリー/PRコメント（Pages URL があるときだけ） ===
       - name: Add link to job summary
         if: ${{ always() && steps.deployment.outputs.page_url }}
         run: |
-          echo "### Playwright HTML Report" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Dev Portal / Playwright Report" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "👉 **${{ steps.deployment.outputs.page_url }}**" >> "$GITHUB_STEP_SUMMARY"
+          echo "🏠 Portal: **${{ steps.deployment.outputs.page_url }}**" >> "$GITHUB_STEP_SUMMARY"
+          echo "🧪 Report: **${{ steps.deployment.outputs.page_url }}report/**" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Comment on PR with report link
+      - name: Comment on PR with portal & report links
         if: ${{ github.event_name == 'pull_request' && always() && steps.deployment.outputs.page_url }}
         uses: actions/github-script@v7
         with:
           script: |
-            const url = `${{ toJson(steps.deployment.outputs.page_url) }}`.replace(/^"|"$/g, '');
-            if (!url) return;
-            const body = `🧪 **Playwright Report**\n\n🔗 ${url}`;
+            const base = `${{ toJson(steps.deployment.outputs.page_url) }}`.replace(/^"|"$/g, '');
+            if (!base) return;
+            const body = `🏠 **Dev Portal**\n\n${base}\n\n🧪 **Playwright Report**\n\n${base}report/`;
             const { context, github } = require('@actions/github');
             await github.rest.issues.createComment({
               owner: context.repo.owner,
