@@ -34,7 +34,7 @@ jobs:
       E2E_STRIPE_MOCK: "1"
       STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
       STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
-      DATABASE_URL: "file:./prisma/dev.db"
+      DATABASE_URL: "file:./prisma/dev.db"   # ← ここに作成
 
     steps:
       - name: Checkout
@@ -52,10 +52,16 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
+      # ✅ 追加: DBファイルを作成（スキーマを反映）
+      - name: Prepare SQLite (prisma db push)
+        run: |
+          mkdir -p prisma
+          npx prisma db push --skip-generate
+
       - name: Build Next.js
         run: npm run build
 
-      # ✅ 追加: ビルド成果物があるか事前確認（ここで落ちれば原因が即わかる）
+      # ✅ ビルド成果物を事前確認
       - name: Verify Next.js build output
         run: |
           echo "BASE_URL=$NEXT_PUBLIC_BASE_URL"
@@ -118,8 +124,7 @@ jobs:
     name: Publish combined HTML report to GitHub Pages
     needs: [test]
     runs-on: ubuntu-latest
-    # 常に起動しつつ、後続で条件分岐
-    if: ${{ always() }}
+    if: ${{ always() }}   # 常に起動しつつ、後続で条件分岐
     timeout-minutes: 20
 
     environment:
@@ -145,7 +150,7 @@ jobs:
           path: ./test-results/blobs
           merge-multiple: true
 
-      # ✅ 追加: blob が 1つも無ければ HTML マージも Pages もスキップ
+      # ✅ blob が 1つも無ければ HTML マージも Pages もスキップ
       - name: Check if any blob reports exist
         id: check_blobs
         run: |
@@ -163,7 +168,7 @@ jobs:
         if: steps.check_blobs.outputs.found == 'true'
         run: npx playwright merge-reports --reporter html ./test-results/blobs
 
-      # --- 以下、main のときだけ Pages 公開（かつ blob がある時だけ）
+      # --- main のときだけ Pages 公開（かつ blob がある時だけ）
       - name: Setup Pages
         if: ${{ github.ref == 'refs/heads/main' && steps.check_blobs.outputs.found == 'true' }}
         uses: actions/configure-pages@v5
