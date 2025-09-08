@@ -9,7 +9,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
-  pull-requests: write   # ← 追加：PRコメント投稿に必要
+  pull-requests: write   # PRコメント投稿に必要
 
 # Pages 競合回避
 concurrency:
@@ -61,7 +61,6 @@ jobs:
           --project="${{ matrix.project }}"
           --workers=1
           --reporter=list,junit,blob
-          --output=test-results/${{ matrix.project }}/blob-report
         env:
           E2E_DEBUG: "0"
 
@@ -74,7 +73,6 @@ jobs:
           --workers=1
           --retries=1
           --reporter=list,junit,blob
-          --output=test-results/${{ matrix.project }}/blob-report
         env:
           E2E_DEBUG: "2"
 
@@ -83,7 +81,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: blob-${{ matrix.project }}
-          path: test-results/${{ matrix.project }}/blob-report
+          path: blob-report
           if-no-files-found: error
           retention-days: 7
 
@@ -92,7 +90,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: junit-${{ matrix.project }}
-          path: test-results/${{ matrix.project }}/junit.xml
+          path: junit.xml
           if-no-files-found: warn
           retention-days: 30
 
@@ -100,7 +98,8 @@ jobs:
     name: Publish combined HTML report to GitHub Pages
     needs: [test]
     runs-on: ubuntu-latest
-    if: ${{ always() && github.ref == 'refs/heads/main' }}
+    # ここは常に動かし、下のステップで main 条件を付ける
+    if: ${{ always() }}
     timeout-minutes: 20
 
     environment:
@@ -129,33 +128,37 @@ jobs:
       - name: Merge to single HTML report
         run: npx playwright merge-reports --reporter html ./test-results/blobs
 
+      # --- 以下、main のときだけ Pages 公開 ---
       - name: Setup Pages
+        if: ${{ github.ref == 'refs/heads/main' }}
         uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
+        if: ${{ github.ref == 'refs/heads/main' }}
         uses: actions/upload-pages-artifact@v3
         with:
           path: playwright-report
 
       - name: Deploy to GitHub Pages
         id: deployment
+        if: ${{ github.ref == 'refs/heads/main' }}
         uses: actions/deploy-pages@v4
 
-      # === 追加：実行サマリー/PRコメントにレポートリンクを掲示 ===
+      # === 実行サマリー/PRコメント（Pages URL があるときだけ） ===
       - name: Add link to job summary
-        if: always()
+        if: ${{ always() && steps.deployment.outputs.page_url }}
         run: |
           echo "### Playwright HTML Report" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "👉 **${{ steps.deployment.outputs.page_url }}**" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Comment on PR with report link
-        if: ${{ github.event_name == 'pull_request' && always() }}
+        if: ${{ github.event_name == 'pull_request' && always() && steps.deployment.outputs.page_url }}
         uses: actions/github-script@v7
         with:
           script: |
-            const url = "${{ steps.deployment.outputs.page_url }}";
-            if (!url) return; // main 以外では未発行
+            const url = `${{ toJson(steps.deployment.outputs.page_url) }}`.replace(/^"|"$/g, '');
+            if (!url) return;
             const body = `🧪 **Playwright Report**\n\n🔗 ${url}`;
             const { context, github } = require('@actions/github');
             await github.rest.issues.createComment({
