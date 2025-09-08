@@ -35,11 +35,8 @@ export default defineConfig({
     baseURL: process.env.NEXT_PUBLIC_BASE_URL,
 
     // ▼ E2E_DEBUG でトレース/スクショ/動画を制御
-    //    2: trace=on（常時） / 1: on-first-retry / 0: retain-on-failure
     trace: E2E_DEBUG_TRACE ? 'on' : (E2E_DEBUG_BASIC ? 'on-first-retry' : 'retain-on-failure'),
-    //    2 or 1: 失敗時のみスクショ / 0: スクショ無効
     screenshot: (E2E_DEBUG_BASIC || E2E_DEBUG_TRACE) ? 'only-on-failure' : 'off',
-    //    2: 常時動画 / それ以外: 失敗時のみ保存
     video: E2E_DEBUG_TRACE ? 'on' : 'retain-on-failure',
 
     // （任意だが安定化に寄与）
@@ -54,7 +51,8 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: 'npm run start:e2e',
+    // Aの修正: build → start:e2e を一括で実行
+    command: 'bash -c "npm run build && npm run start:e2e"',
     url: process.env.NEXT_PUBLIC_BASE_URL!,
     timeout: 120_000,
     reuseExistingServer: false,

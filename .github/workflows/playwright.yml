@@ -51,7 +51,7 @@ jobs:
       - name: Build Next.js
         run: npm run build
 
-      # ✅ 追加: ビルド成果物があるか事前確認 (.next 配下をダンプして落ちるなら即 fail)
+      # ✅ 追加: ビルド成果物があるか事前確認（ここで落ちれば原因が即わかる）
       - name: Verify Next.js build output
         run: |
           echo "BASE_URL=$NEXT_PUBLIC_BASE_URL"
@@ -59,11 +59,11 @@ jobs:
             echo "::error::.next directory not found. Did 'npm run build' succeed?"
             exit 1
           fi
-          ls -la .next
+          ls -la .next || true
           if [ -f ".next/BUILD_ID" ]; then
             echo "BUILD_ID: $(cat .next/BUILD_ID)"
           else
-            echo "::warning:: .next/BUILD_ID not found (acceptable on some Next versions)."
+            echo "::warning::.next/BUILD_ID not found (acceptable on some Next versions)."
           fi
 
       - name: Install Playwright browsers & deps
@@ -91,13 +91,14 @@ jobs:
         env:
           E2E_DEBUG: "2"
 
+      # ▶ アーティファクト（無ければ WARN にして後段を生かす）
       - name: Upload blob report (per-project)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: blob-${{ matrix.project }}
           path: blob-report
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 7
 
       - name: Upload JUnit XML (per-project)
@@ -113,7 +114,7 @@ jobs:
     name: Publish combined HTML report to GitHub Pages
     needs: [test]
     runs-on: ubuntu-latest
-    # ここは常に動かし、下のステップで main 条件を付ける
+    # 常に起動しつつ、後続で条件分岐
     if: ${{ always() }}
     timeout-minutes: 20
 
@@ -140,23 +141,38 @@ jobs:
           path: ./test-results/blobs
           merge-multiple: true
 
+      # ✅ 追加: blob が 1つも無ければ HTML マージも Pages もスキップ
+      - name: Check if any blob reports exist
+        id: check_blobs
+        run: |
+          shopt -s nullglob
+          files=( ./test-results/blobs/**/metadata.json ./test-results/blobs/**/blob-report/* )
+          if [ ${#files[@]} -gt 0 ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "Found ${#files[@]} report files."
+          else
+            echo "::warning:: No blob reports found; skipping HTML merge & Pages deploy."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Merge to single HTML report
+        if: steps.check_blobs.outputs.found == 'true'
         run: npx playwright merge-reports --reporter html ./test-results/blobs
 
-      # --- 以下、main のときだけ Pages 公開 ---
+      # --- 以下、main のときだけ Pages 公開（かつ blob がある時だけ）
       - name: Setup Pages
-        if: ${{ github.ref == 'refs/heads/main' }}
+        if: ${{ github.ref == 'refs/heads/main' && steps.check_blobs.outputs.found == 'true' }}
         uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
-        if: ${{ github.ref == 'refs/heads/main' }}
+        if: ${{ github.ref == 'refs/heads/main' && steps.check_blobs.outputs.found == 'true' }}
         uses: actions/upload-pages-artifact@v3
         with:
           path: playwright-report
 
       - name: Deploy to GitHub Pages
         id: deployment
-        if: ${{ github.ref == 'refs/heads/main' }}
+        if: ${{ github.ref == 'refs/heads/main' && steps.check_blobs.outputs.found == 'true' }}
         uses: actions/deploy-pages@v4
 
       # === 実行サマリー/PRコメント（Pages URL があるときだけ） ===
