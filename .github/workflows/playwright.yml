@@ -51,6 +51,21 @@ jobs:
       - name: Build Next.js
         run: npm run build
 
+      # ✅ 追加: ビルド成果物があるか事前確認 (.next 配下をダンプして落ちるなら即 fail)
+      - name: Verify Next.js build output
+        run: |
+          echo "BASE_URL=$NEXT_PUBLIC_BASE_URL"
+          if [ ! -d ".next" ]; then
+            echo "::error::.next directory not found. Did 'npm run build' succeed?"
+            exit 1
+          fi
+          ls -la .next
+          if [ -f ".next/BUILD_ID" ]; then
+            echo "BUILD_ID: $(cat .next/BUILD_ID)"
+          else
+            echo "::warning:: .next/BUILD_ID not found (acceptable on some Next versions)."
+          fi
+
       - name: Install Playwright browsers & deps
         run: npx playwright install --with-deps
 
