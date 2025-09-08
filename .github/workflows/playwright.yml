@@ -34,7 +34,7 @@ jobs:
       E2E_STRIPE_MOCK: "1"
       STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
       STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
-      DATABASE_URL: "file:./prisma/dev.db"   # ← ここに作成
+      DATABASE_URL: "file:./prisma/dev.db"   # ✅ SQLite DB ファイル
 
     steps:
       - name: Checkout
@@ -52,7 +52,7 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
-      # ✅ 追加: DBファイルを作成（スキーマを反映）
+      # ✅ DBファイルを作成（スキーマ反映）
       - name: Prepare SQLite (prisma db push)
         run: |
           mkdir -p prisma
@@ -124,12 +124,10 @@ jobs:
     name: Publish combined HTML report to GitHub Pages
     needs: [test]
     runs-on: ubuntu-latest
-    if: ${{ always() }}   # 常に起動しつつ、後続で条件分岐
+    if: ${{ always() }}   # 常に起動 → 後段条件で制御
     timeout-minutes: 20
 
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    # ← ジョブレベルの environment は付けない（PRで保護に引っかかるため）
 
     steps:
       - name: Checkout
@@ -183,6 +181,7 @@ jobs:
         id: deployment
         if: ${{ github.ref == 'refs/heads/main' && steps.check_blobs.outputs.found == 'true' }}
         uses: actions/deploy-pages@v4
+        # environment は不要（job レベルで付けない）
 
       # === 実行サマリー/PRコメント（Pages URL があるときだけ） ===
       - name: Add link to job summary
