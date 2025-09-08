@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
@@ -13,7 +15,7 @@ export async function GET(req: Request) {
   const statusRaw = (url.searchParams.get('status') ?? '').trim() as
     | 'PENDING'
     | 'PAID'
-    | 'CANCELLED'
+    | 'CANCELED'
     | '';
   const dateFromRaw = (url.searchParams.get('dateFrom') ?? '').trim();
   const dateToRaw = (url.searchParams.get('dateTo') ?? '').trim();
@@ -65,7 +67,13 @@ export async function GET(req: Request) {
       updatedAt: r.updatedAt ? r.updatedAt.toISOString() : undefined,
       date: r.date.toISOString(),
       slot: r.slot,
-      counts: (r.counts ?? null) as Record<string, number> | null,
+      // 👇 counts は個別カラムから構築する
+      counts: {
+        adult: r.adultCount,
+        student: r.studentCount,
+        child: r.childCount,
+        infant: r.infantCount,
+      },
       amount: r.amount,
       status: r.status,
       customer: r.customer

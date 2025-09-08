@@ -1,11 +1,1 @@
-{
-  "version": 4,
-  "routes": {},
-  "dynamicRoutes": {},
-  "notFoundRoutes": [],
-  "preview": {
-    "previewModeId": "838de054c2c7e7fed5387e1f111f53a4",
-    "previewModeSigningKey": "a5a54e2d3157c5a68299598d52abf7907705354e51e888b3cbab45494ec6ff69",
-    "previewModeEncryptionKey": "f3bdc8039f5438be67e405b16be122625aaede12eb9b5117a9642798f2af5b84"
-  }
-}
+{"version":4,"routes":{"/admin/customers":{"experimentalBypassFor":[{"type":"header","key":"Next-Action"},{"type":"header","key":"content-type","value":"multipart/form-data;.*"}],"initialRevalidateSeconds":false,"srcRoute":"/admin/customers","dataRoute":"/admin/customers.rsc"},"/mock-checkout":{"experimentalBypassFor":[{"type":"header","key":"Next-Action"},{"type":"header","key":"content-type","value":"multipart/form-data;.*"}],"initialRevalidateSeconds":false,"srcRoute":"/mock-checkout","dataRoute":"/mock-checkout.rsc"},"/":{"experimentalBypassFor":[{"type":"header","key":"Next-Action"},{"type":"header","key":"content-type","value":"multipart/form-data;.*"}],"initialRevalidateSeconds":false,"srcRoute":"/","dataRoute":"/index.rsc"},"/admin/reservations":{"experimentalBypassFor":[{"type":"header","key":"Next-Action"},{"type":"header","key":"content-type","value":"multipart/form-data;.*"}],"initialRevalidateSeconds":false,"srcRoute":"/admin/reservations","dataRoute":"/admin/reservations.rsc"},"/admin":{"experimentalBypassFor":[{"type":"header","key":"Next-Action"},{"type":"header","key":"content-type","value":"multipart/form-data;.*"}],"initialRevalidateSeconds":false,"srcRoute":"/admin","dataRoute":"/admin.rsc"}},"dynamicRoutes":{},"notFoundRoutes":[],"preview":{"previewModeId":"24ef65af60ef40f8a5ff932bb7ccb091","previewModeSigningKey":"905b8f4e2b72308749426355a44e64c3e58cad0ce1f5003469b005b1893b219a","previewModeEncryptionKey":"fc5204279a6cbf01a3743c43684689fe1496181787291f4e374197fc7f7fe59f"}}

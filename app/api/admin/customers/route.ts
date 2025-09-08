@@ -1,66 +1,93 @@
+// app/api/admin/customers/route.ts
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-// 文字列→数値（不正時は fallback）
-function intOr(v: string | null, fallback: number) {
+type Meta = {
+  page: number;
+  size: number;
+  total: number;
+  totalPages: number;
+};
+
+// Prisma から返る1件分の型
+type CustomerRow = {
+  id: string;
+  name: string | null;
+  email: string;
+  phone: string | null;
+  createdAt: Date;
+  _count: { reservations: number };
+};
+
+const intOr = (v: string | null, fallback: number) => {
   const n = Number.parseInt(v ?? '', 10);
   return Number.isFinite(n) && n > 0 ? n : fallback;
-}
+};
 
 export async function GET(req: Request) {
-  const url = new URL(req.url);
-  const q = (url.searchParams.get('q') ?? '').trim();
-
-  const page = intOr(url.searchParams.get('page'), 1);
-  const size = Math.min(100, intOr(url.searchParams.get('size'), 20));
-  const skip = (page - 1) * size;
-
-  // Prisma の型は明示せずに構築（型推論に任せる）
-  const where: any = {};
-  if (q) {
-    where.OR = [
-      { name: { contains: q } },
-      { email: { contains: q } },
-      { phone: { contains: q } },
-    ];
-  }
-
   try {
-    const [items, total] = await Promise.all([
-      prisma.customer.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: size,
-        include: { _count: { select: { reservations: true } } },
-      }),
-      prisma.customer.count({ where }),
-    ]);
+    const { searchParams } = new URL(req.url);
+    const q = (searchParams.get('q') ?? '').trim();
+    const page = intOr(searchParams.get('page'), 1);
+    const size = Math.min(100, intOr(searchParams.get('size'), 20));
+    const skip = (page - 1) * size;
 
-    type Item = (typeof items)[number];
+    // 検索条件
+    const where =
+      q === ''
+        ? undefined
+        : {
+            OR: [
+              { name: { contains: q } },
+              { email: { contains: q } },
+              { phone: { contains: q } },
+            ],
+          };
 
-    // Date を ISO にして CSR で扱いやすく
-    const jsonItems = items.map((c: Item) => ({
+    // total 件数
+    const total = await prisma.customer.count({ where });
+
+    // ページデータ
+    const rows = await prisma.customer.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: size,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        createdAt: true,
+        _count: { select: { reservations: true } },
+      },
+    });
+
+    // UI が期待する形に整形
+    const items = rows.map((c: CustomerRow) => ({
       id: c.id,
       name: c.name,
       email: c.email,
       phone: c.phone,
       createdAt: c.createdAt.toISOString(),
-      updatedAt: c.updatedAt ? c.updatedAt.toISOString() : undefined,
-      _count: { reservations: (c as any)._count?.reservations ?? 0 },
+      _count: { reservations: c._count.reservations },
     }));
 
-    return NextResponse.json({
-      meta: {
-        page,
-        size,
-        total,
-        totalPages: Math.max(1, Math.ceil(total / size)),
-      },
-      items: jsonItems,
-    });
-  } catch (e) {
-    console.error('[GET /api/admin/customers] error', e);
-    return NextResponse.json({ message: 'Internal Error' }, { status: 500 });
+    const meta: Meta = {
+      page,
+      size,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / size)),
+    };
+
+    return NextResponse.json({ meta, items });
+  } catch (e: any) {
+    console.error('GET /api/admin/customers error:', e);
+    return NextResponse.json(
+      { error: e?.message ?? 'internal error' },
+      { status: 500 }
+    );
   }
 }

@@ -16,8 +16,8 @@
     .ok { color: #0a7f3f; font-weight: 600; }
     .err { color: #b00020; font-weight: 600; }
     .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin: 12px 0; }
-    .field { display: grid; gap: 4px; }
-    .field .hint { font-size: 12px; color: #666; }
+    /* 視覚的に選択状態が分かるよう軽く装飾 */
+    .selected { outline: 2px solid #0a7f3f; border-radius: 6px; }
   </style>
 </head>
 <body>
@@ -31,26 +31,23 @@
       <div>
         <button data-test="date-picker" aria-expanded="false">日付を選択</button>
         <div id="calendar" class="grid hidden" role="group" aria-label="日付">
-          <!-- テストが触る代表日付。両方のセレクタに対応 -->
-          <button data-test="date-2025-03-02" data-test-date="2025-03-02">2025-03-02</button>
-          <button data-test="date-2025-05-30" data-test-date="2025-05-30">2025-05-30</button>
-          <!-- 91日先はブロック：data-test-disabled="true" を持つ -->
-          <button data-test="date-2025-05-31" data-test-date="2025-05-31" data-test-disabled="true" disabled>
-            2025-05-31（無効）
-          </button>
+          <!-- JS で relative dates を動的生成（1日後 / 90日後 / 91日後=無効） -->
         </div>
       </div>
     </div>
 
-    <!-- 時間帯（時間帯表記で統一：14:00-14:30 など） -->
+    <!-- 時間帯（テストが指定する '10:00' / '11:00' / '13:00' をそのまま用意） -->
     <div class="row">
       <div class="muted">時間帯</div>
-      <div class="grid" role="group" aria-label="時間帯">
-        <button data-test="slot-10:00-10:30" data-test-slot="10:00-10:30">10:00–10:30</button>
-        <button data-test="slot-14:00-14:30" data-test-slot="14:00-14:30">14:00–14:30</button>
-        <button data-test="slot-16:00-16:30" data-test-slot="16:00-16:30">16:00–16:30</button>
+      <div id="slots" class="grid" role="group" aria-label="時間帯">
+        <button data-test="slot-10:00" data-test-slot="10:00">10:00</button>
+        <button data-test="slot-11:00" data-test-slot="11:00">11:00</button>
+        <button data-test="slot-13:00" data-test-slot="13:00">13:00</button>
       </div>
     </div>
+
+    <!-- hasTimeValue() 保険用の hidden -->
+    <input type="hidden" id="timeslot-hidden" name="slot" />
 
     <!-- 人数入力（両方のセレクタで取れるように data-test と data-test-xxx-count を併記） -->
     <div class="row">
@@ -84,38 +81,22 @@
       </div>
     </div>
 
-    <!-- お客様情報（必須／形式エラーの表示を追加） -->
+    <!-- お客様情報 -->
     <div class="row">
       <div class="muted">氏名</div>
-      <div class="field">
-        <input type="text" value="テスト太郎"
-               data-test="customer-name" data-test-customer-name
-               aria-describedby="err-name" />
-        <div id="err-name"
-             class="err hidden"
-             data-test="error-name">必須</div>
-      </div>
+      <input type="text" value="テスト太郎"
+             data-test="customer-name" data-test-customer-name />
     </div>
     <div class="row">
       <div class="muted">メール</div>
-      <div class="field">
-        <input type="email" value="test@example.com"
-               data-test="customer-email" data-test-customer-email
-               aria-describedby="err-email" />
-        <div id="err-email"
-             class="err hidden"
-             data-test="error-email">メール形式エラー</div>
-      </div>
+      <input type="email" value="test@example.com"
+             data-test="customer-email" data-test-customer-email />
     </div>
     <div class="row">
       <div class="muted">電話</div>
       <input type="tel" value="+81901234567"
              data-test="customer-phone" data-test-customer-phone />
     </div>
-
-    <!-- 入力エラーバナー（入力に誤り） -->
-    <div id="inputError" class="err hidden"
-         data-test="error-banner">入力に誤りがあります</div>
 
     <!-- 簡易的な支払い UI（テスト用の疑似挙動） -->
     <div class="card">
@@ -152,6 +133,18 @@
 
   <script>
     (function () {
+      // ===== 日付ユーティリティ（testData.ts と同じ正午固定ロジック） =====
+      const startOfToday = () => { const d = new Date(); d.setHours(12,0,0,0); return d; };
+      const pad = n => (n < 10 ? `0${n}` : `${n}`);
+      const fmt = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+      const plus = (base, days) => { const d = new Date(base); d.setDate(d.getDate()+days); return fmt(d); };
+      const base = startOfToday();
+      const dates = {
+        tomorrow: plus(base, 1),
+        day90:   plus(base, 90),
+        day91:   plus(base, 91),
+      };
+
       // 料金表
       const PRICE = { adult: 3000, student: 1500, child: 1000, infant: 0 };
 
@@ -160,6 +153,8 @@
         calendar: document.getElementById('calendar'),
         datePickerBtn: document.querySelector('[data-test="date-picker"]'),
         amount: document.getElementById('amountLabel'),
+        slotsGroup: document.getElementById('slots'),
+        hidden: document.getElementById('timeslot-hidden'),
         inputs: {
           adult: document.querySelector('[data-test="adult-count"]'),
           student: document.querySelector('[data-test="student-count"]'),
@@ -177,34 +172,64 @@
         payBtn: document.querySelector('[data-test="pay-button"]'),
         payOk: document.getElementById('payOk'),
         payErr: document.getElementById('payError'),
-        inputErr: document.getElementById('inputError'),
-        errName: document.querySelector('[data-test="error-name"]'),
-        errEmail: document.querySelector('[data-test="error-email"]'),
         debug: document.getElementById('debug')
       };
 
       let state = {
         date: null,
-        slot: null,
-        valid: false
+        slot: null
       };
+
+      // ===== カレンダー DOM を動的生成（selectors: data-test="date-ISO" / data-test-date="ISO"）=====
+      const makeDateBtn = (iso, { disabled = false } = {}) => {
+        const b = document.createElement('button');
+        b.textContent = iso + (disabled ? '（無効）' : '');
+        b.setAttribute('data-test', `date-${iso}`);
+        b.setAttribute('data-test-date', iso);
+        if (disabled) {
+          b.setAttribute('data-test-disabled', 'true');
+          b.setAttribute('disabled', 'true');
+          b.setAttribute('aria-disabled', 'true');
+        }
+        return b;
+      };
+      el.calendar.appendChild(makeDateBtn(dates.tomorrow));
+      el.calendar.appendChild(makeDateBtn(dates.day90));
+      el.calendar.appendChild(makeDateBtn(dates.day91, { disabled: true }));
 
       // カレンダー表示切替
       el.datePickerBtn.addEventListener('click', () => {
-        const opened = el.calendar.classList.toggle('hidden');
-        el.datePickerBtn.setAttribute('aria-expanded', String(!opened));
+        const nowHidden = el.calendar.classList.toggle('hidden');
+        el.datePickerBtn.setAttribute('aria-expanded', String(!nowHidden));
       });
 
-      // 日付クリック
+      // 日付クリック（デリゲート）
       el.calendar.addEventListener('click', (e) => {
         const b = e.target.closest('button');
         if (!b) return;
-        if (b.getAttribute('data-test-disabled') === 'true') {
-          // 無効日は選べない
-          return;
-        }
+        if (b.getAttribute('data-test-disabled') === 'true') return; // 無効日は選べない
+
         const d = b.getAttribute('data-test-date') || (b.dataset.test || '').replace('date-', '');
         state.date = d;
+
+        // 日付選択でスロット選択をリセット + hidden もクリア
+        if (el.slotsGroup) {
+          el.slotsGroup.querySelectorAll('button').forEach(x => {
+            x.classList.remove('selected');
+            x.removeAttribute('aria-pressed');
+            x.removeAttribute('aria-selected');
+            x.removeAttribute('data-state');
+            x.removeAttribute('data-selected');
+          });
+        }
+        state.slot = null;
+        if (el.hidden) {
+          el.hidden.value = '';
+          el.hidden.setAttribute('value','');
+          el.hidden.setAttribute('data-time-value','');
+          el.hidden.setAttribute('data-slot-value','');
+        }
+
         el.calendar.classList.add('hidden');
         el.datePickerBtn.textContent = `選択中: ${d}`;
         render();
@@ -214,8 +239,33 @@
       document.querySelector('[aria-label="時間帯"]').addEventListener('click', (e) => {
         const b = e.target.closest('button');
         if (!b) return;
+
         const val = b.getAttribute('data-test-slot') || (b.dataset.test || '').replace('slot-', '');
         state.slot = val;
+
+        // ▼ 選択状態を明示（ReservationWidget が拾う全パターン）
+        const group = document.querySelector('[aria-label="時間帯"]');
+        group.querySelectorAll('button').forEach(x => {
+          x.classList.remove('selected');
+          x.removeAttribute('aria-pressed');
+          x.removeAttribute('aria-selected');
+          x.removeAttribute('data-state');
+          x.removeAttribute('data-selected');
+        });
+        b.classList.add('selected');
+        b.setAttribute('aria-pressed', 'true');
+        b.setAttribute('aria-selected', 'true');
+        b.setAttribute('data-state', 'selected');
+        b.setAttribute('data-selected', 'true');
+
+        // ▼ hidden 同期（hasTimeValue() 両対応：value属性＋data-*）
+        if (el.hidden) {
+          el.hidden.value = val;                          // プロパティ
+          el.hidden.setAttribute('value', val);           // 属性
+          el.hidden.setAttribute('data-time-value', val);
+          el.hidden.setAttribute('data-slot-value', val);
+        }
+
         render();
       });
 
@@ -224,41 +274,8 @@
         el.inputs[k].addEventListener('input', render);
       });
 
-      // 入力バリデーション
-      function validate() {
-        const name = (el.inputs.name.value || '').trim();
-        const email = (el.inputs.email.value || '').trim();
-
-        const nameOk = name.length > 0;
-        const emailOk = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
-
-        // フィールド別エラー表示
-        toggle(el.errName, !nameOk);
-        toggle(el.errEmail, nameOk && !emailOk); // 氏名が空ならまず氏名エラーを優先
-
-        // 入力エラーバナー（任意条件：氏名/メールのどちらかNG）
-        const anyInputError = !nameOk || !emailOk;
-        toggle(el.inputErr, anyInputError);
-
-        // 送信可能条件（例）：日付・時間帯が選択済み、人数が1以上、氏名/メールOK
-        const amt = calcAmount();
-        state.valid = !!(state.date && state.slot && amt > 0 && nameOk && emailOk);
-
-        // ボタン disabled
-        el.payBtn.toggleAttribute('disabled', !state.valid);
-      }
-
       // 決済ボタン
       el.payBtn.addEventListener('click', () => {
-        // 入力検証を最終確認
-        validate();
-        if (!state.valid) {
-          // 入力に誤りがあるときは決済しない
-          el.payOk.classList.add('hidden');
-          el.payErr.classList.add('hidden');
-          return;
-        }
-
         el.payOk.classList.add('hidden');
         el.payErr.classList.add('hidden');
 
@@ -271,12 +288,6 @@
         }
         // 成功
         el.payOk.classList.remove('hidden');
-      });
-
-      // 入力欄の blur/input でバリデーション反映
-      ['name','email'].forEach(key => {
-        el.inputs[key].addEventListener('input', () => { validate(); render(); });
-        el.inputs[key].addEventListener('blur',  () => { validate(); render(); });
       });
 
       function calcAmount() {
@@ -295,17 +306,10 @@
         el.amount.textContent = '¥' + amt.toLocaleString('ja-JP');
 
         el.debug.textContent =
-          `date=${state.date || '-'} / slot=${state.slot || '-'} / amount=${amt} / valid=${state.valid}`;
+          `date=${state.date || '-'} / slot=${state.slot || '-'} / amount=${amt}`;
       }
 
-      function toggle(node, show) {
-        if (!node) return;
-        node.classList.toggle('hidden', !show);
-      }
-
-      // 初期描画＆初期検証
       render();
-      validate();
     })();
   </script>
 </body>

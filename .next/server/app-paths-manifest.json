@@ -1,3 +1,14 @@
 {
-  "/page": "app/page.js"
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/admin/customers/route": "app/api/admin/customers/route.js",
+  "/api/admin/reservations/[id]/route": "app/api/admin/reservations/[id]/route.js",
+  "/api/reservations/route": "app/api/reservations/route.js",
+  "/mock-checkout/page": "app/mock-checkout/page.js",
+  "/api/checkout/route": "app/api/checkout/route.js",
+  "/page": "app/page.js",
+  "/api/admin/reservations/route": "app/api/admin/reservations/route.js",
+  "/admin/customers/page": "app/admin/customers/page.js",
+  "/admin/reservations/[id]/page": "app/admin/reservations/[id]/page.js",
+  "/admin/page": "app/admin/page.js",
+  "/admin/reservations/page": "app/admin/reservations/page.js"
 }

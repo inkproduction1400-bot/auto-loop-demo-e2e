@@ -1,4 +1,7 @@
 // app/admin/page.tsx
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 import { prisma } from '@/lib/prisma';
 
 /* --------- 日付ユーティリティ --------- */
@@ -112,7 +115,7 @@ async function getRevenueSeries(): Promise<SeriesPoint[]> {
 
 /* --------- 横長SVGラインチャート（クライアント不要） --------- */
 function RevenueChartSVG({ series }: { series: SeriesPoint[] }) {
-  const width = 1200; // ビューボックス幅（CSSで親幅にフィット）
+  const width = 1200;
   const height = 260;
   const padL = 48;
   const padR = 16;
@@ -120,8 +123,7 @@ function RevenueChartSVG({ series }: { series: SeriesPoint[] }) {
   const padB = 36;
 
   const xs = (i: number) =>
-    padL +
-    ((width - padL - padR) * i) / Math.max(1, series.length - 1);
+    padL + ((width - padL - padR) * i) / Math.max(1, series.length - 1);
 
   const maxY = Math.max(1, ...series.map((s) => s.amount));
   const ys = (v: number) =>
@@ -168,12 +170,7 @@ function RevenueChartSVG({ series }: { series: SeriesPoint[] }) {
           />
         ))}
         {/* 折れ線 */}
-        <polyline
-          fill="none"
-          stroke="#2563eb"
-          strokeWidth="2.5"
-          points={points}
-        />
+        <polyline fill="none" stroke="#2563eb" strokeWidth="2.5" points={points} />
         {/* 範囲塗り（線の下） */}
         <polyline
           fill="rgba(37, 99, 235, 0.12)"
@@ -272,7 +269,7 @@ export default async function AdminTopPage() {
           </ul>
         </Card>
 
-        {/* ★ 追加：キャンセル数（今日/今週） */}
+        {/* 追加：キャンセル数（今日/今週） */}
         <Card title="キャンセル数">
           <Stat label="本日" value={`${cancelledToday} 件`} />
           <div style={{ height: 6 }} />
@@ -326,10 +323,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   chartCard: {
     background: '#fff',
-    border: '1px solid #e5e7eb',
+    border: '1px solid #e5e7eb', // ← 修正済み（正しい文字列リテラル）
     borderRadius: 12,
     padding: 8,
   },
 };
-
-/* レスポンシブ（Server ComponentなのでCSS-in-JSは使わず最小限のinline） */
