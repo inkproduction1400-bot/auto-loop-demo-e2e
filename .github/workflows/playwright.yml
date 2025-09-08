@@ -127,9 +127,7 @@ jobs:
     if: ${{ always() }}   # 常に起動 → 後段条件で制御
     timeout-minutes: 20
 
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    # ← ジョブレベルの environment は付けない（PRで保護に引っかかるため）
 
     steps:
       - name: Checkout
@@ -183,6 +181,7 @@ jobs:
         id: deployment
         if: ${{ github.ref == 'refs/heads/main' && steps.check_blobs.outputs.found == 'true' }}
         uses: actions/deploy-pages@v4
+        # environment は不要（job レベルで付けない）
 
       # === 実行サマリー/PRコメント（Pages URL があるときだけ） ===
       - name: Add link to job summary
