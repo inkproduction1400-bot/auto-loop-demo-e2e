@@ -34,6 +34,7 @@ jobs:
       E2E_STRIPE_MOCK: "1"
       STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
       STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+      DATABASE_URL: "file:./prisma/dev.db"
 
     steps:
       - name: Checkout
@@ -47,6 +48,9 @@ jobs:
 
       - name: Install deps
         run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
 
       - name: Build Next.js
         run: npm run build

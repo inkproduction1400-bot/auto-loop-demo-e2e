@@ -9,6 +9,16 @@ type Meta = {
   totalPages: number;
 };
 
+// Prisma から返る1件分の型
+type CustomerRow = {
+  id: string;
+  name: string | null;
+  email: string;
+  phone: string | null;
+  createdAt: Date;
+  _count: { reservations: number };
+};
+
 const intOr = (v: string | null, fallback: number) => {
   const n = Number.parseInt(v ?? '', 10);
   return Number.isFinite(n) && n > 0 ? n : fallback;
@@ -54,7 +64,7 @@ export async function GET(req: Request) {
     });
 
     // UI が期待する形に整形
-    const items = rows.map((c) => ({
+    const items = rows.map((c: CustomerRow) => ({
       id: c.id,
       name: c.name,
       email: c.email,
