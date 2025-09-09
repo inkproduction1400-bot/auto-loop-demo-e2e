@@ -22,7 +22,14 @@
   </nav>
   <main class="main">
     <section class="card">
-      <p><em>CI / CD は README に該当章が見つかりませんでした。</em></p>
+      <h2>Stripe をモックして E2E 実行（既定）</h2>
+<p>export E2E_STRIPE_MOCK=1
+npx playwright test</p>
+<h2>実 Stripe で実行（Secrets 必須 / 注意！）</h2>
+<p>export E2E_STRIPE_MOCK=0
+export STRIPE_SECRET_KEY=sk_test_xxx
+export STRIPE_PUBLISHABLE_KEY=pk_test_xxx
+npx playwright test</p>
 
     </section>
   </main>

@@ -22,7 +22,49 @@
   </nav>
   <main class="main">
     <section class="card">
-      <p><em>DB スキーマ は README に該当章が見つかりませんでした。</em></p>
+      <h2>Prisma クライアント生成（schema 変更時は都度）</h2>
+<p>npx prisma generate</p>
+<h2>Prisma クライアント生成（スキーマ変更時は必須）</h2>
+<p>npx prisma generate</p>
+<h2>スキーマを DB に反映（SQLite）</h2>
+<p>npx prisma db push</p>
+<h2>DB リセット（注意：データ消える）</h2>
+<p>npx prisma migrate reset
+CI では ビルド前に DB を準備（db push相当）し、Next.js の webServer 起動時に参照できるようにしています。
+CI/CD パイプライン
+フロー概要（PR → main）
+PR 作成/更新
+  ├─ E2E: chromium / firefox / webkit を並列実行
+  └─ （blob レポートをアーティファクト収集）</p>
+<p>main へ Merge
+  ├─ 上記 E2E が再走（main）
+  ├─ HTML レポートにマージ
+  └─ GitHub Pages へ公開（成功時は PR/Job Summary にリンク）
+Workflow: .github/workflows/playwright.yml</p>
+<p>ポイント
+Generate Prisma client → Build Next.js → Verify build → Playwright
+Pages 公開は main かつ blob がある時のみ
+Stripe は既定 モック。Secrets 設定があれば実 Stripe も可</p>
+<p>リリース運用
+PR は緑（E2E 通過）であること
+main マージ後に Pages が自動更新
+将来、本番デプロイ（Vercel 等）と連携する場合は *main or release/ に限定**し、
+E2E 成功時のみデプロイにするのが推奨</p>
+<p>トラブルシュート
+「Could not find a production build in .next」
+npm run build が失敗。playwright.yml の Verify step で詳細を確認
+Prisma のエラー（Unable to open the database file）
+DATABASE_URL のパス/権限を確認。CI では file:./prisma/dev.db を使用
+Stripe のモジュールが見つからない/キー不足
+モック実行に戻す：E2E_STRIPE_MOCK=1
+実行が必要なら Secrets（STRIPE_SECRET_KEY / STRIPE_PUBLISHABLE_KEY）を設定
+Pages の公開が PR で拒否
+セキュリティ仕様。main のみ公開可にしているため正常挙動です</p>
+<p>付録：リンク集
+🔗 Playwright Report (最新): このページ下部のリンクから
+🧪 Actions: GitHub → Actions → E2E (Playwright)
+🗂️ スキーマ: prisma/schema.prisma
+⚙️ CI 設定: .github/workflows/playwright.yml</p>
 
     </section>
   </main>
