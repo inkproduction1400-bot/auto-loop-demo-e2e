@@ -1,0 +1,66 @@
+<!doctype html><html lang="ja">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>auto-loop-demo-e2e | 開発ポータル</title>
+<link rel="stylesheet" href="./assets/portal.css"/>
+<script defer src="./assets/portal.js"></script>
+</head>
+<body>
+<header class="header">
+  <h1>auto-loop-demo-e2e | 開発ポータル</h1>
+</header>
+
+<div class="container">
+  <nav class="nav" aria-label="サイドバー">
+    <h2>概要</h2>
+    <a href="./docs/getting-started.html">セットアップ</a>
+    <a href="./docs/dev-rules.html">開発ルール</a>
+    <a href="./docs/architecture.html">アーキテクチャ</a>
+    <a href="./docs/api.html">API</a>
+    <a href="./docs/db-schema.html">DB スキーマ</a>
+    <a href="./docs/ci-cd.html">CI / CD</a>
+
+    <h2>テスト</h2>
+    <a href="./reports/latest.html">E2E レポート</a>
+
+    <h2>リンク</h2>
+    <a class="link" href="https://github.com/…/actions" target="_blank" rel="noopener">GitHub Actions</a>
+    <a class="link" href="https://github.com/…/pulls" target="_blank" rel="noopener">Pull Requests</a>
+  </nav>
+
+  <main class="main" id="main">
+    <section class="card">
+      <h2>ようこそ</h2>
+      <p>本ポータルはプロジェクトの“入口”であり、主要ドキュメントとテストレポートへ素早く辿れることを目的とするで御座る。</p>
+      <ul>
+        <li>初めての方は <a class="link" href="./docs/getting-started.html">セットアップ</a> へ</li>
+        <li>チーム規約は <a class="link" href="./docs/dev-rules.html">開発ルール</a> を参照</li>
+        <li>E2Eの結果は <a class="link" href="./reports/latest.html">最新レポート</a> に常時導線</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h3>クイックコマンド</h3>
+<pre><code># 依存関係
+npm ci
+
+# Prisma (ローカル)
+npx prisma generate
+npx prisma db push
+
+# Dev
+npm run dev
+
+# E2E（Stripeモック例）
+export E2E_STRIPE_MOCK=1
+npx playwright test
+</code></pre>
+    </section>
+  </main>
+</div>
+
+<footer class="footer">
+  © auto-loop-demo-e2e — Dev Portal / GitHub Pages で御座る
+</footer>
+</body>
+</html>
