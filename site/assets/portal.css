@@ -1,23 +1,74 @@
 :root{
-    --bg:#0b1324; --panel:#141d34; --text:#e8ecf1; --muted:#a3b1c6; --brand:#6aa6ff;
+    /* 色設計：サイドバーはダーク、メインはライト */
+    --bg-sidebar:#0b1324;      /* sidebar 背景 */
+    --bg-panel:#141d34;        /* sidebar 内カード/hover */
+    --text-sidebar:#e8ecf1;    /* sidebar 文字 */
+    --muted:#a3b1c6;
+    --brand:#4f86ff;
+  
+    --bg-main:#ffffff;         /* main 背景 */
+    --text-main:#0b1220;       /* main 文字 */
+    --card:#ffffff;            /* main カード背景 */
+    --card-border:#e5e7eb;     /* main カード枠線 */
+    --code-bg:#f3f4f6;         /* コード背景 */
   }
+  
   *{box-sizing:border-box}
   html,body{margin:0}
-  body{background:var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto}
-  .header{display:flex;align-items:center;gap:.75rem;padding:.8rem 1rem;border-bottom:1px solid #223;position:sticky;top:0;background:rgba(11,19,36,.85);backdrop-filter:saturate(120%) blur(6px);z-index:10}
-  .header h1{font-size:1rem;margin:0;opacity:.9}
+  body{
+    background:var(--bg-main);
+    color:var(--text-main);
+    font:16px/1.6 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans JP",sans-serif;
+  }
+  
+  /* ヘッダーはライトで固定 */
+  .header{
+    display:flex;align-items:center;gap:.75rem;
+    padding:.8rem 1rem;border-bottom:1px solid #e5e7eb;
+    position:sticky;top:0;background:#fff;z-index:10
+  }
+  .header h1{font-size:1rem;margin:0;color:var(--text-main);opacity:.9}
+  
+  /* 2カラム：左サイドバー固定 */
   .container{display:grid;grid-template-columns:260px 1fr;min-height:calc(100dvh - 56px)}
-  .nav{border-right:1px solid #223;background:var(--panel);padding:1rem;position:sticky;top:56px;height:calc(100dvh - 56px);overflow:auto}
-  .nav h2{font-size:.9rem;margin:.6rem 0;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
-  .nav a{display:block;padding:.35rem .5rem;border-radius:.5rem;color:var(--text);text-decoration:none}
+  
+  /* サイドバー（黒地×白文字） */
+  .nav{
+    border-right:1px solid #1e293b;
+    background:var(--bg-sidebar);
+    color:var(--text-sidebar);
+    padding:1rem;position:sticky;top:56px;height:calc(100dvh - 56px);overflow:auto
+  }
+  .nav h2{
+    font-size:.9rem;margin:.6rem 0;color:var(--muted);
+    text-transform:uppercase;letter-spacing:.06em
+  }
+  .nav a{
+    display:flex;align-items:center;gap:.5rem;
+    padding:.38rem .55rem;border-radius:.55rem;
+    color:var(--text-sidebar);text-decoration:none
+  }
   .nav a:hover{background:#1d2948}
-  .main{padding:1.25rem 1.5rem}
-  .card{border:1px solid #223;background:#0f1830;border-radius:1rem;padding:1rem;margin:0 0 1rem}
+  .nav .icon{width:18px;height:18px;flex:0 0 18px;opacity:.9}
+  
+  /* メイン（白地×黒文字） */
+  .main{padding:1.25rem 1.5rem;background:var(--bg-main);color:var(--text-main)}
+  .card{
+    border:1px solid var(--card-border);
+    background:var(--card);
+    border-radius:1rem;padding:1rem;margin:0 0 1rem
+  }
+  
+  /* リンク・コード */
   a.link{color:var(--brand);text-decoration:none}
   a.link:hover{text-decoration:underline}
-  pre{background:#101a30;border:1px solid #233;border-radius:.75rem;padding:.75rem;overflow:auto}
+  pre{background:var(--code-bg);border:1px solid #e5e7eb;border-radius:.75rem;padding:.75rem;overflow:auto}
   code,kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-  .footer{border-top:1px solid #223;opacity:.8;padding:1rem;text-align:center}
+  
+  /* フッター */
+  .footer{border-top:1px solid #e5e7eb;opacity:.8;padding:1rem;text-align:center}
+  
+  /* レスポンシブ */
   @media (max-width: 960px){
     .container{grid-template-columns:1fr}
     .nav{position:static;height:auto}
