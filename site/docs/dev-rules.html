@@ -22,7 +22,40 @@
   </nav>
   <main class="main">
     <section class="card">
-      <p><em>開発ルール は README に該当章が見つかりませんでした。</em></p>
+      <h2>開発サーバー起動 (<a href="http://localhost:3100">http://localhost:3100</a>)</h2>
+<p>npm run dev</p>
+<p>開発ルール
+ブランチ戦略
+main … 常にデプロイ可能な安定ブランチ
+feature/<em>, fix/</em>, chore/* … 作業ブランチ
+PR は Draft → Ready for review → Merge の流れ
+コミット規約（Conventional Commits）
+feat: 機能追加, fix: 不具合修正, chore: 雑務, docs: 文書のみ, test: テストのみ など
+例: fix: fallback to mock when Stripe keys missing (CI)</p>
+<p>コード規約
+TypeScript 厳格モード
+Prettier/ ESLint を標準設定（必要なら追加）
+CSS Module を既定（global.d.ts で型宣言済）</p>
+<p>PR チェックリスト
+ 単体/手元で E2E が通る（npx playwright test）
+ .env* や秘密情報をコミットしていない
+ 変更点が README/コメントに反映されている
+ スクショ/動画（Playwright artifacts）が必要なら添付</p>
+<p>テスト戦略
+レイヤ
+E2E（本プロジェクトの主軸）: 重要なフローをブラウザで検証
+予約の新規作成、バリデーション、Stripe モック成功/失敗など
+API: Prisma 経由の CRUD とレスポンス整形（管理画面 API）
+型: npx tsc --noEmit でビルド前に静的検査</p>
+<p>コマンド</p>
+<h2>レポート表示（ローカル）</h2>
+<p>npx playwright show-report
+データベース (Prisma/SQLite)
+ローカル/CI は SQLite を利用（軽量・セットアップ不要）
+スキーマ: prisma/schema.prisma
+Reservation: adultCount / studentCount / childCount / infantCount に分割済
+ReservationStatus: SQLite 用に String 列として運用（将来 RDB で enum に変更可）
+よく使うコマンド</p>
 
     </section>
   </main>
