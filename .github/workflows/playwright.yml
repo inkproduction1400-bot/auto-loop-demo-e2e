@@ -9,7 +9,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
-  pull-requests: write   # PRコメント投稿に必要
+  pull-requests: write
 
 # Pages 競合回避
 concurrency:
@@ -34,7 +34,7 @@ jobs:
       E2E_STRIPE_MOCK: "1"
       STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
       STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
-      DATABASE_URL: "file:./prisma/dev.db"   # ✅ SQLite DB ファイル
+      DATABASE_URL: "file:./prisma/dev.db"
 
     steps:
       - name: Checkout
@@ -52,7 +52,6 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
-      # ✅ DBファイルを作成（スキーマ反映）
       - name: Prepare SQLite (prisma db push)
         run: |
           mkdir -p prisma
@@ -61,7 +60,6 @@ jobs:
       - name: Build Next.js
         run: npm run build
 
-      # ✅ ビルド成果物を事前確認
       - name: Verify Next.js build output
         run: |
           echo "BASE_URL=$NEXT_PUBLIC_BASE_URL"
@@ -79,7 +77,6 @@ jobs:
       - name: Install Playwright browsers & deps
         run: npx playwright install --with-deps
 
-      # --- 軽量実行（デバッグ無効） ---
       - name: Run tests (fast) ${{ matrix.project }}
         run: >
           npx playwright test
@@ -89,7 +86,6 @@ jobs:
         env:
           E2E_DEBUG: "0"
 
-      # --- 失敗時に詳細リトライ ---
       - name: Retry with debug trace ${{ matrix.project }}
         if: failure()
         run: >
@@ -101,7 +97,6 @@ jobs:
         env:
           E2E_DEBUG: "2"
 
-      # ▶ アーティファクト（無ければ WARN にして後段を生かす）
       - name: Upload blob report (per-project)
         if: always()
         uses: actions/upload-artifact@v4
@@ -124,21 +119,19 @@ jobs:
     name: Publish dev portal & HTML report to GitHub Pages
     needs: [test]
     runs-on: ubuntu-latest
-    if: ${{ always() }}   # 常に起動 → 後段条件で制御
+    if: ${{ always() }}
     timeout-minutes: 20
-
-    # ← ジョブレベルの environment は付けない（PRで保護に引っかかるため）
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node (for merge tool)
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Install deps (for merge tool)
+      - name: Install dev deps
         run: npm ci
 
       - name: Download all blob reports
@@ -148,124 +141,70 @@ jobs:
           path: ./test-results/blobs
           merge-multiple: true
 
-      # ✅ blob が 1つも無ければ HTML マージも Pages もスキップ
-      - name: Check if any blob reports exist
-        id: check_blobs
+      # blob があれば単一HTMLにマージ（無ければ /site のみ公開）
+      - name: Check & merge Playwright reports
+        id: merge_html
         run: |
           shopt -s nullglob
           files=( ./test-results/blobs/**/metadata.json ./test-results/blobs/**/blob-report/* )
           if [ ${#files[@]} -gt 0 ]; then
             echo "found=true" >> "$GITHUB_OUTPUT"
-            echo "Found ${#files[@]} report files."
+            npx playwright merge-reports --reporter html ./test-results/blobs
           else
-            echo "::warning:: No blob reports found; skipping HTML merge & Pages deploy."
             echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "::notice:: No blob reports found; will publish /site only."
           fi
 
-      - name: Merge to single HTML report
-        if: steps.check_blobs.outputs.found == 'true'
-        run: npx playwright merge-reports --reporter html ./test-results/blobs
-
-      # === 開発ポータルの生成（README へのリンク＋最新レポート導線）
-      - name: Build Dev Portal (index.html)
+      # ========= Pages へ載せる出力を作成（/site 常時 + レポート任意） =========
+      - name: Collect Pages output (site + report)
         run: |
-          mkdir -p site
-          cat > site/index.html <<'HTML'
-          <!doctype html>
-          <html lang="ja">
-          <head>
-            <meta charset="utf-8" />
-            <meta name="viewport" content="width=device-width,initial-scale=1" />
-            <title>auto-loop-demo-e2e – 開発ポータル</title>
-            <style>
-              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans JP", sans-serif; margin: 0; padding: 24px; line-height: 1.6; color: #111; }
-              header { border-bottom: 1px solid #e5e7eb; margin-bottom: 20px; }
-              h1 { font-size: 28px; margin: 0 0 8px; }
-              .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
-              .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; background: #fff; }
-              .muted { color: #6b7280; }
-              a.button { display:inline-block; padding:10px 14px; border-radius:8px; text-decoration:none; border:1px solid #d1d5db; }
-              code { background:#f3f4f6; padding:2px 6px; border-radius:6px; }
-              footer { margin-top: 40px; color:#6b7280; font-size: 12px; }
-            </style>
-          </head>
-          <body>
-            <header>
-              <h1>予約システム E2E – 開発ポータル</h1>
-              <p class="muted">Next.js + Playwright / CI / Stripe モック / レポート公開</p>
-            </header>
-
-            <section class="cards">
-              <div class="card">
-                <h3>ドキュメント（README）</h3>
-                <p>プロジェクトの全体像・開発ルールは README を参照。</p>
-                <p><a class="button" href="https://github.com/${{ github.repository }}/blob/main/README.md" target="_blank" rel="noopener">Open README on GitHub ↗</a></p>
-              </div>
-
-              <div class="card">
-                <h3>最新の E2E レポート</h3>
-                <p>GitHub Actions の実行結果（HTML Report）。</p>
-                <p><a class="button" href="./report/index.html">Open Playwright Report</a></p>
-              </div>
-
-              <div class="card">
-                <h3>ローカル手順（抜粋）</h3>
-                <p><code>npm ci</code> → <code>npm run dev</code> → <code>npx playwright test</code></p>
-                <p class="muted">より詳細は README を参照してください。</p>
-              </div>
-            </section>
-
-            <footer>© ${{ github.repository }} – GitHub Pages</footer>
-          </body>
-          </html>
-          HTML
-
-      # レポートがある時だけ site/report/ に同梱
-      - name: Bundle report into site/
-        if: steps.check_blobs.outputs.found == 'true'
-        run: |
-          mkdir -p site
-          # playwright-report は直下に生成済み（merge-reports）
-          if [ -d "playwright-report" ]; then
-            mkdir -p site/report
-            cp -a playwright-report/. site/report/
+          mkdir -p pages-out
+          # 1) /site をそのまま採用
+          if [ -d "site" ]; then
+            cp -a site/. pages-out/
           else
-            echo "::warning:: playwright-report directory not found."
+            echo "::error:: 'site' directory not found in repository."
+            exit 1
           fi
+          # 2) レポートがあれば /playwright-report/ として同梱
+          if [ "${{ steps.merge_html.outputs.found }}" = "true" ] && [ -d "playwright-report" ]; then
+            mkdir -p pages-out/playwright-report
+            cp -a playwright-report/. pages-out/playwright-report/
+          fi
+          echo ">>> pages-out tree:"
+          ls -la pages-out || true
 
-      # --- main のときだけ Pages 公開（かつ blob がある時だけ）
+      # main のとき常時デプロイ
       - name: Setup Pages
-        if: ${{ github.ref == 'refs/heads/main' && steps.check_blobs.outputs.found == 'true' }}
+        if: ${{ github.ref == 'refs/heads/main' }}
         uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
-        if: ${{ github.ref == 'refs/heads/main' && steps.check_blobs.outputs.found == 'true' }}
+        if: ${{ github.ref == 'refs/heads/main' }}
         uses: actions/upload-pages-artifact@v3
         with:
-          path: site   # ← dev portal + report を同梱
+          path: pages-out
 
       - name: Deploy to GitHub Pages
         id: deployment
-        if: ${{ github.ref == 'refs/heads/main' && steps.check_blobs.outputs.found == 'true' }}
+        if: ${{ github.ref == 'refs/heads/main' }}
         uses: actions/deploy-pages@v4
 
-      # === 実行サマリー/PRコメント（Pages URL があるときだけ） ===
-      - name: Add link to job summary
-        if: ${{ always() && steps.deployment.outputs.page_url }}
+      - name: Add links to job summary
+        if: ${{ steps.deployment.outputs.page_url }}
         run: |
-          echo "### Dev Portal / Playwright Report" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Dev Portal / Reports" >> "$GITHUB_STEP_SUMMARY"
           echo "🏠 Portal: **${{ steps.deployment.outputs.page_url }}**" >> "$GITHUB_STEP_SUMMARY"
-          echo "🧪 Report: **${{ steps.deployment.outputs.page_url }}report/**" >> "$GITHUB_STEP_SUMMARY"
+          echo "🧪 Report: **${{ steps.deployment.outputs.page_url }}playwright-report/**" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Comment on PR with portal & report links
-        if: ${{ github.event_name == 'pull_request' && always() && steps.deployment.outputs.page_url }}
+        if: ${{ github.event_name == 'pull_request' && steps.deployment.outputs.page_url }}
         uses: actions/github-script@v7
         with:
           script: |
             const base = `${{ toJson(steps.deployment.outputs.page_url) }}`.replace(/^"|"$/g, '');
             if (!base) return;
-            const body = `🏠 **Dev Portal**\n\n${base}\n\n🧪 **Playwright Report**\n\n${base}report/`;
+            const body = `🏠 **Dev Portal**\n\n${base}\n\n🧪 **Playwright Report**\n\n${base}playwright-report/`;
             const { context, github } = require('@actions/github');
             await github.rest.issues.createComment({
               owner: context.repo.owner,
