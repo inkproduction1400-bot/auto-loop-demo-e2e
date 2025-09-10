@@ -21,6 +21,23 @@ jobs:
     name: Run E2E on ${{ matrix.project }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
+
+    # ▼ CIでPostgreSQLを起動（SQLiteは廃止）
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: appdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U test -d appdb"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
     strategy:
       fail-fast: false
       matrix:
@@ -34,7 +51,8 @@ jobs:
       E2E_STRIPE_MOCK: "1"
       STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
       STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
-      DATABASE_URL: "file:./prisma/dev.db"
+      # ▼ CI内のPostgresに接続
+      DATABASE_URL: "postgresql://test:test@localhost:5432/appdb"
 
     steps:
       - name: Checkout
@@ -52,10 +70,9 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
-      - name: Prepare SQLite (prisma db push)
-        run: |
-          mkdir -p prisma
-          npx prisma db push --skip-generate
+      # ▼ DBスキーマを適用（SQLiteの db push は削除）
+      - name: Apply DB migrations (PostgreSQL)
+        run: npx prisma migrate deploy
 
       - name: Build Next.js
         run: npm run build

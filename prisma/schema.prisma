@@ -1,10 +1,13 @@
 // prisma/schema.prisma
+
+// Prisma Client の生成
 generator client {
   provider = "prisma-client-js"
 }
 
+// DB接続設定（PostgreSQL/Supabase）
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -22,18 +25,18 @@ model Reservation {
   date            DateTime
   slot            String
 
-  // Json → 個別カラムに分解（SQLite 対応）
+  // 個別人数カラム
   adultCount      Int      @default(0)
   studentCount    Int      @default(0)
   childCount      Int      @default(0)
   infantCount     Int      @default(0)
 
-  amount          Int      // 円
+  amount          Int      // 金額（円）
 
-  // enum → String（アプリ側では 'PENDING' | 'PAID' | 'CANCELED' | 'FAILED' を使う想定）
+  // ステータス文字列
   status          String   @default("PENDING")
 
-  paymentIntentId String?  // Stripe 連携時に使用
+  paymentIntentId String?  // Stripe 連携用
   notes           String?
 
   customer        Customer @relation(fields: [customerId], references: [id])
