@@ -12,12 +12,12 @@
     "test:e2e": "playwright test",
     "test:e2e:report": "playwright show-report",
     "lint": "next lint",
-
     "build:portal": "node scripts/build-portal.mjs",
     "docs:from-readme": "npm run build:portal"
   },
   "dependencies": {
     "@prisma/client": "5.22.0",
+    "@sentry/nextjs": "^10.11.0",
     "next": "^14.2.32",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
