@@ -1,0 +1,62 @@
+name: CI (Build & Sentry Release)
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # ---- Sentry ----
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+      # SENTRY_URL: ${{ secrets.SENTRY_URL }}   # self-host のみ
+
+      # ---- App env ----
+      NODE_ENV: production
+      NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
+
+      # リリース名はコミットSHAを採用
+      SENTRY_RELEASE: ${{ github.sha }}
+      SENTRY_ENV: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Prisma generate
+        run: npx prisma generate
+
+      - name: Build (Next.js)
+        run: npm run build
+
+      - name: Install sentry-cli
+        run: curl -sL https://sentry.io/get-cli/ | bash
+
+      - name: Create Sentry release & upload sourcemaps
+        run: |
+          # 1) リリース作成
+          sentry-cli releases new "$SENTRY_RELEASE" --project "$SENTRY_PROJECT"
+
+          # 2) ソースマップ一括アップロード
+          #    Next.js は .next 以下に出力。配信パスは "~/_next" が標準。
+          sentry-cli releases files "$SENTRY_RELEASE" upload-sourcemaps \
+            .next \
+            --url-prefix "~/_next" \
+            --validate \
+            --rewrite
+
+          # 3) コミット関連付け
+          sentry-cli releases set-commits "$SENTRY_RELEASE" --auto
+
+          # 4) リリース確定
+          sentry-cli releases finalize "$SENTRY_RELEASE"
