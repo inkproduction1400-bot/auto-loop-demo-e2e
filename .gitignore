@@ -1,11 +1,27 @@
+# Node.js
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build & coverage
 dist/
+.next/
+out/
 coverage/
 test-results/
-.env*
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# System
 .DS_Store
 
+# Generated
 /generated/prisma
 
-# Sentry Config File
+# Sentry Config
 .env.sentry-build-plugin
