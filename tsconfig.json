@@ -17,17 +17,18 @@
   
       "baseUrl": ".",
       "paths": {
-        "@/*": ["./src/*"]
+        "@/*": ["./*", "./src/*"],
+        "@components/*": ["./components/*", "./src/components/*"],
+        "@lib/*": ["./lib/*", "./src/lib/*"],
+        "@app/*": ["./app/*", "./src/app/*"]
       },
   
-      "plugins": [
-        { "name": "next" }
-      ]
+      "plugins": [{ "name": "next" }]
     },
     "include": [
+      "next-env.d.ts",
       "**/*.ts",
       "**/*.tsx",
-      "next-env.d.ts",
       ".next/types/**/*.ts"
     ],
     "exclude": ["node_modules"]

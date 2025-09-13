@@ -31,6 +31,15 @@ function endOfWeek(d = new Date()) {
   return x;
 }
 const fmtJPY = (n: number) => `¥${(n ?? 0).toLocaleString('ja-JP')}`;
+const fmtDT = (iso: string | Date) => {
+  const d = new Date(iso);
+  const y = d.getFullYear();
+  const m = `${d.getMonth() + 1}`.padStart(2, '0');
+  const day = `${d.getDate()}`.padStart(2, '0');
+  const hh = `${d.getHours()}`.padStart(2, '0');
+  const mm = `${d.getMinutes()}`.padStart(2, '0');
+  return `${y}/${m}/${day} ${hh}:${mm}`;
+};
 
 /* --------- サマリ取得（今日/今週, ステータス別含む） --------- */
 async function getSummary() {
@@ -111,6 +120,32 @@ async function getRevenueSeries(): Promise<SeriesPoint[]> {
   }
 
   return Array.from(buckets.entries()).map(([date, amount]) => ({ date, amount }));
+}
+
+/* --------- 最新予約（直近10件） --------- */
+type LatestRow = {
+  id: string;
+  createdAt: Date;
+  date: Date;
+  slot: string | null;
+  amount: number;
+  status: string;
+  customer?: { name: string | null; email: string | null } | null;
+};
+async function getLatestReservations(limit = 10): Promise<LatestRow[]> {
+  return prisma.reservation.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+    select: {
+      id: true,
+      createdAt: true,
+      date: true,
+      slot: true,
+      amount: true,
+      status: true,
+      customer: { select: { name: true, email: true } },
+    },
+  });
 }
 
 /* --------- 横長SVGラインチャート（クライアント不要） --------- */
@@ -217,7 +252,11 @@ function RevenueChartSVG({ series }: { series: SeriesPoint[] }) {
 
 /* --------- ダッシュボード（Server Component） --------- */
 export default async function AdminTopPage() {
-  const [s, series] = await Promise.all([getSummary(), getRevenueSeries()]);
+  const [s, series, latest] = await Promise.all([
+    getSummary(),
+    getRevenueSeries(),
+    getLatestReservations(10),
+  ]);
 
   const Card = ({
     title,
@@ -247,6 +286,26 @@ export default async function AdminTopPage() {
 
   return (
     <div style={{ display: 'grid', gap: 16 }}>
+      {/* 追加：CSVエクスポートボタンバー */}
+      <div style={styles.exportBar} aria-label="エクスポート操作">
+        <a
+          href="/api/admin/export/reservations.csv?limit=2000"
+          target="_blank"
+          rel="noopener"
+          style={styles.exportBtn}
+        >
+          予約一覧をCSVで保存
+        </a>
+        <a
+          href="/api/admin/export/customers.csv?limit=5000"
+          target="_blank"
+          rel="noopener"
+          style={styles.exportBtn}
+        >
+          顧客一覧をCSVで保存
+        </a>
+      </div>
+
       {/* 上段4カード（売上×2 + ステータス×2） */}
       <div style={styles.grid}>
         <Card title="本日の売上（確定）">
@@ -282,6 +341,48 @@ export default async function AdminTopPage() {
         <div style={{ fontWeight: 900, margin: '6px 0 10px' }}>売上推移（直近30日）</div>
         <div style={styles.chartCard}>
           <RevenueChartSVG series={series} />
+        </div>
+      </div>
+
+      {/* 追加：最新予約一覧（直近10件） */}
+      <div>
+        <div style={{ fontWeight: 900, margin: '6px 0 10px' }}>最新予約（直近10件）</div>
+        <div style={styles.tableCard}>
+          <table style={styles.table} aria-label="最新予約一覧">
+            <thead style={styles.thead}>
+              <tr>
+                <th style={{...styles.th, width: 160}}>作成</th>
+                <th style={{...styles.th, width: 160}}>日付</th>
+                <th style={{...styles.th, width: 80}}>枠</th>
+                <th style={{...styles.th, width: 90}}>金額</th>
+                <th style={{...styles.th, width: 110}}>状態</th>
+                <th style={styles.th}>顧客</th>
+                <th style={{...styles.th, width: 80}}>詳細</th>
+              </tr>
+            </thead>
+            <tbody>
+              {latest.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={styles.empty}>データがありません</td>
+                </tr>
+              ) : latest.map((r) => (
+                <tr key={r.id} style={styles.tr}>
+                  <td style={styles.td}>{fmtDT(r.createdAt)}</td>
+                  <td style={styles.td}>{fmtDT(r.date)}</td>
+                  <td style={styles.td}>{r.slot ?? '-'}</td>
+                  <td style={styles.td}>{fmtJPY(r.amount)}</td>
+                  <td style={styles.td}>{r.status}</td>
+                  <td style={styles.td}>
+                    {(r.customer?.name ?? '-')}{' '}
+                    <span style={{ color: '#64748b' }}>（{r.customer?.email ?? '-'}）</span>
+                  </td>
+                  <td style={styles.td}>
+                    <a href={`/reservations/${r.id}`} style={styles.detailBtn}>詳細</a>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -323,8 +424,69 @@ const styles: Record<string, React.CSSProperties> = {
   },
   chartCard: {
     background: '#fff',
-    border: '1px solid #e5e7eb', // ← 修正済み（正しい文字列リテラル）
+    border: '1px solid #e5e7eb',
     borderRadius: 12,
     padding: 8,
+  },
+  /* 追加：最新予約テーブル */
+  tableCard: {
+    background: '#fff',
+    border: '1px solid #e5e7eb',
+    borderRadius: 12,
+    overflowX: 'auto',
+  },
+  table: {
+    width: '100%',
+    borderCollapse: 'collapse',
+  },
+  thead: {
+    background: '#f8fafc',
+    color: '#475569',
+    fontSize: 13,
+  },
+  th: {
+    textAlign: 'left' as const,
+    padding: '10px 14px',
+    borderBottom: '1px solid #e5e7eb',
+    whiteSpace: 'nowrap' as const,
+  },
+  tr: {
+    borderBottom: '1px solid #f1f5f9',
+  },
+  td: {
+    padding: '10px 14px',
+    fontSize: 13,
+    verticalAlign: 'top' as const,
+    whiteSpace: 'nowrap' as const,
+  },
+  empty: {
+    padding: '14px',
+    textAlign: 'center' as const,
+    color: '#64748b',
+  },
+  detailBtn: {
+    display: 'inline-block',
+    border: '1px solid #e5e7eb',
+    borderRadius: 8,
+    padding: '4px 8px',
+    fontSize: 12,
+    textDecoration: 'none',
+    color: '#0f172a',
+  },
+  /* 追加：CSVエクスポートボタンバー */
+  exportBar: {
+    display: 'flex',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  exportBtn: {
+    display: 'inline-block',
+    border: '1px solid #e5e7eb',
+    borderRadius: 8,
+    padding: '8px 12px',
+    fontSize: 13,
+    textDecoration: 'none',
+    color: '#0f172a',
+    background: '#ffffff',
   },
 };
