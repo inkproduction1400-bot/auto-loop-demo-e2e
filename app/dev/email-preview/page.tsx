@@ -1,9 +1,10 @@
 // app/dev/email-preview/page.tsx
+'use client'; // ← クライアント指示は必ず最上部
 
-// ✅ ビルド時プリレンダーを抑止（SSG 対象外にする）
+// このページは常に動的実行（SSG/ISR 無効）
 export const dynamic = 'force-dynamic';
-
-'use client';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 
 import { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -15,14 +16,22 @@ import {
 
 // ✅ CI や本番で開発用ページを完全無効化したい場合は
 //    NEXT_PUBLIC_DISABLE_DEV_ROUTES=1 を環境変数に設定（Actions でも可）
-const DISABLED = process.env.NEXT_PUBLIC_DISABLE_DEV_ROUTES === '1';
+const DISABLED: boolean = process.env.NEXT_PUBLIC_DISABLE_DEV_ROUTES === '1';
 
-function sanitize(v: unknown) {
-  return v === null || v === undefined ? '' : String(v);
-}
+type Vars = {
+  reservationId: string;
+  customerName: string;
+  date: string;
+  slot: string;
+  amount: string;
+  currency: string;
+};
+
+const toStr = (v: unknown): string =>
+  v === null || v === undefined ? '' : String(v);
 
 export default function EmailPreviewPage() {
-  // 🚫 さらに厳格: 無効化フラグ時は即座にトップへ退避（クライアントだけ）
+  // 🚫 無効化フラグ時は即座にトップへ退避（クライアントのみ）
   useEffect(() => {
     if (DISABLED && typeof window !== 'undefined') {
       window.location.replace('/');
@@ -37,32 +46,32 @@ export default function EmailPreviewPage() {
   const sp = useSearchParams();
 
   // searchParams を plain object に変換（安定化用）
-  const spObj = useMemo(() => {
-    return Object.fromEntries(sp.entries());
-  }, [sp]);
+  const spObj = useMemo<Record<string, string>>(
+    () => Object.fromEntries(sp.entries()),
+    [sp],
+  );
 
   // type を小文字で正規化
   const type = (spObj.type ?? 'confirmed').toLowerCase(); // confirmed | payment
 
   // Vars オブジェクト
-  const vars = useMemo(
+  const vars = useMemo<Vars>(
     () => ({
-      reservationId: sanitize(spObj.reservationId ?? 'abc123'),
-      customerName: sanitize(spObj.customerName ?? 'テスト太郎'),
-      date: sanitize(spObj.date ?? '2025-09-15'),
-      slot: sanitize(spObj.slot ?? '10:00'),
+      reservationId: toStr(spObj.reservationId ?? 'abc123'),
+      customerName: toStr(spObj.customerName ?? 'テスト太郎'),
+      date: toStr(spObj.date ?? '2025-09-15'),
+      slot: toStr(spObj.slot ?? '10:00'),
       amount: String(Number(spObj.amount ?? '3000')), // 数値化して文字列化
-      currency: sanitize(spObj.currency ?? 'JPY'),
+      currency: toStr(spObj.currency ?? 'JPY'),
     }),
-    [spObj]
+    [spObj],
   );
 
   // テンプレ適用
   const built = useMemo(() => {
-    if (type === 'payment') {
-      return buildPaymentSucceeded(vars);
-    }
-    return buildReservationConfirmed(vars);
+    return type === 'payment'
+      ? buildPaymentSucceeded(vars)
+      : buildReservationConfirmed(vars);
   }, [type, vars]);
 
   return (
@@ -104,6 +113,7 @@ export default function EmailPreviewPage() {
           padding: 16,
           background: '#fff',
         }}
+        // 信頼済みテンプレ出力のみを描画
         dangerouslySetInnerHTML={{ __html: built.html }}
       />
     </main>
