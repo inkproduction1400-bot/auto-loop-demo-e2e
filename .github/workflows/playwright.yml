@@ -53,6 +53,10 @@ jobs:
       STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
       # ▼ CI内のPostgresに接続
       DATABASE_URL: "postgresql://test:test@localhost:5432/appdb"
+      # ▼ これで /dev/* をビルド・実行から除外（email-preview のプリレンダー回避）
+      NEXT_PUBLIC_DISABLE_DEV_ROUTES: "1"
+      # （お好み）Nextのテレメトリ無効化
+      NEXT_TELEMETRY_DISABLED: "1"
 
     steps:
       - name: Checkout
@@ -80,6 +84,7 @@ jobs:
       - name: Verify Next.js build output
         run: |
           echo "BASE_URL=$NEXT_PUBLIC_BASE_URL"
+          echo "NEXT_PUBLIC_DISABLE_DEV_ROUTES=$NEXT_PUBLIC_DISABLE_DEV_ROUTES"
           if [ ! -d ".next" ]; then
             echo "::error::.next directory not found. Did 'npm run build' succeed?"
             exit 1
