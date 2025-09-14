@@ -1,43 +1,47 @@
 // app/api/checkout/confirm/route.ts
 import { NextResponse } from "next/server";
-import * as Sentry from "@sentry/nextjs";
 import { sendMail } from "@/lib/notify/mailer";
 import { buildPaymentSucceeded } from "@/lib/notify/templates";
+import { withSpan } from "@/src/lib/obs/tracing";
 
-/** Prisma を遅延 import */
-async function getPrisma(): Promise<null | InstanceType<any>> {
+/** Prisma を遅延 import（型付き） */
+async function getPrisma() {
   try {
     const mod = await import("@prisma/client");
-    const PrismaClient = (mod as any).PrismaClient;
+    const { PrismaClient } = mod as typeof import("@prisma/client");
     return new PrismaClient();
   } catch {
     return null;
   }
 }
 
-function s(v: any) {
+function s(v: unknown): string {
   if (v === null || v === undefined) return "";
   return String(v);
 }
 
+type UpdatedReservation = {
+  id: string;
+  amount: number | null;
+  customerId: string | null;
+};
+
 // GET /api/checkout/confirm
-// - Mock:   /api/checkout/confirm?status=success&reservationId=xxx&amount=1200&currency=jpy
+// - Mock:   /api/checkout/confirm?status=success&reservationId=xxx&amount=1200&currency=jpy&mock=1
 // - Stripe: /api/checkout/confirm?session_id=cs_test_...
 export async function GET(req: Request) {
   const prisma = await getPrisma();
-
   if (!prisma) {
-    Sentry.captureMessage("checkout.confirm: prisma not available", { level: "error" });
     return NextResponse.json({ ok: false, error: "prisma not available" }, { status: 503 });
   }
 
-  return Sentry.startSpan({ name: "checkout.confirm" }, async (rootSpan) => {
+  return withSpan("checkout.confirm", async () => {
     try {
       const url = new URL(req.url);
       const isMock = process.env.E2E_STRIPE_MOCK === "1" || url.searchParams.get("mock") === "1";
 
       let reservationId = "";
-      let amount: number | undefined = undefined;
+      let amount: number | undefined;
       let currency = "jpy";
       let paymentIntentId = "";
 
@@ -45,7 +49,10 @@ export async function GET(req: Request) {
         // ---- Mock ルート（UI からクエリを直で受け取る）
         const status = url.searchParams.get("status");
         if (status !== "success") {
-          return NextResponse.json({ ok: false, error: "status is not success (mock)" }, { status: 400 });
+          return NextResponse.json(
+            { ok: false, error: "status is not success (mock)" },
+            { status: 400 }
+          );
         }
         reservationId = s(url.searchParams.get("reservationId"));
         amount = Number(url.searchParams.get("amount") ?? "");
@@ -66,8 +73,10 @@ export async function GET(req: Request) {
         const { default: Stripe } = await import("stripe");
         const stripe = new Stripe(STRIPE_SECRET_KEY);
 
-        const session = await stripe.checkout.sessions.retrieve(s(sessionId), { expand: ["payment_intent"] });
-        const pi = session.payment_intent as any;
+        const session = await stripe.checkout.sessions.retrieve(s(sessionId), {
+          expand: ["payment_intent"],
+        });
+
         if (!session || session.status !== "complete") {
           return NextResponse.json({ ok: false, error: "session not complete" }, { status: 400 });
         }
@@ -75,7 +84,10 @@ export async function GET(req: Request) {
         reservationId = s(session.metadata?.reservationId);
         amount = Number(session.amount_total ?? 0);
         currency = s(session.currency ?? "jpy");
-        paymentIntentId = s(pi?.id ?? session.payment_intent ?? "");
+
+        const pi = session.payment_intent;
+        paymentIntentId =
+          typeof pi === "string" ? pi : (pi?.id ?? s(session.payment_intent ?? ""));
       }
 
       if (!reservationId) {
@@ -83,47 +95,59 @@ export async function GET(req: Request) {
       }
 
       // ---- DB 更新
-      const updated = await Sentry.startSpan({ name: "checkout.confirm.db" }, async (dbSpan) => {
-        const rec = await (prisma as any).reservation.update({
+      const updated = await withSpan("checkout.confirm.db", async () => {
+        const rec = await prisma.reservation.update({
           where: { id: reservationId },
           data: {
             status: "CONFIRMED",
             paymentIntentId: paymentIntentId || null,
           },
         });
-        dbSpan?.setAttribute?.("reservation.id", rec?.id ?? "");
-        return rec;
+        // 必要フィールドのみ抽出（型安全にアクセス）
+        const slim: UpdatedReservation = {
+          id: rec.id,
+          amount: (rec as { amount: number | null }).amount ?? null,
+          customerId: (rec as { customerId: string | null }).customerId ?? null,
+        };
+        return slim;
       });
 
-      // ---- 決済完了メール送信
-      await Sentry.startSpan({ name: "checkout.confirm.notify" }, async () => {
+      // ---- 決済完了メール送信（失敗しても全体は成功にする）
+      await withSpan("checkout.confirm.notify", async () => {
         try {
           const built = buildPaymentSucceeded({
             reservationId,
-            amount: amount ?? updated?.amount,
+            amount: amount ?? updated.amount ?? 0,
             currency: currency || "jpy",
             siteUrl: process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3100",
           });
-          // 予約時に紐づく顧客のメールを取得（簡易）
-          const customer = await (prisma as any).customer.findUnique({
-            where: { id: updated.customerId },
-            select: { email: true, name: true },
-          });
+
+          let to = "test@example.com";
+          if (updated.customerId) {
+            const customer = await prisma.customer.findUnique({
+              where: { id: updated.customerId },
+              select: { email: true, name: true },
+            });
+            if (customer?.email) to = customer.email;
+          }
 
           await sendMail({
-            to: s(customer?.email ?? "test@example.com"),
+            to,
             built,
             tags: { reservationId, via: "checkout.confirm" },
           });
         } catch (mailErr) {
-          Sentry.captureException(mailErr, { extra: { endpoint: "checkout.confirm.notify", reservationId } });
+          console.error("checkout.confirm.notify failed:", mailErr);
         }
       });
 
       return NextResponse.json({ ok: true, reservation: updated });
-    } catch (err: any) {
-      Sentry.captureException(err, { extra: { endpoint: "checkout.confirm" } });
-      return NextResponse.json({ ok: false, error: err?.message ?? "confirm error" }, { status: 500 });
+    } catch (err) {
+      console.error("checkout.confirm error:", err);
+      const msg = err instanceof Error ? err.message : "confirm error";
+      return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+    } finally {
+      await prisma.$disconnect().catch(() => {});
     }
   });
 }

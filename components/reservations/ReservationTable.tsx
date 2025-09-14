@@ -8,6 +8,46 @@ import type { Reservation, ReservationListResponse } from '@/lib/types';
 
 type Props = { initial: ReservationListResponse };
 
+// サーバから返る予約アイテムの最小形（受け口）
+type ApiReservationItem = Partial<
+  Reservation & {
+    adultCount: number;
+    studentCount: number;
+    childCount: number;
+    infantCount: number;
+    created_at: string;
+    slot: string | null;
+  }
+>;
+type ApiMeta = Partial<{ total: number; page: number; limit: number }>;
+type ReservationsApiShape = { reservations?: unknown; meta?: unknown };
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null;
+}
+function toNum(v: unknown, fallback = 0): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+function toStr(v: unknown, fallback = ''): string {
+  return typeof v === 'string' ? v : fallback;
+}
+function asApiItems(v: unknown): ApiReservationItem[] {
+  return Array.isArray(v) ? (v as ApiReservationItem[]) : [];
+}
+function asApiMeta(v: unknown): ApiMeta {
+  return isRecord(v) ? (v as ApiMeta) : {};
+}
+
+// status の正規化関数
+function normalizeStatus(v: unknown): Reservation['status'] {
+  const up = String(v ?? 'PENDING').toUpperCase();
+  // API 側では PAID/CONFIRMED/CANCELLED/CANCELED の揺れがある想定
+  if (up === 'CANCELLED' || up === 'CANCELED') return 'CANCELED';
+  if (up === 'PAID' || up === 'CONFIRMED') return 'CONFIRMED'; // PAID を CONFIRMED に丸める
+  return 'PENDING';
+}
+
 export default function ReservationTable({ initial }: Props) {
   const router = useRouter();
   const [page, setPage] = React.useState(initial.page);
@@ -27,34 +67,53 @@ export default function ReservationTable({ initial }: Props) {
         { cache: 'no-store', credentials: 'include' }
       );
       if (!res.ok) throw new Error('Failed to fetch reservations');
-      const json = await res.json();
-      const items = Array.isArray(json?.reservations) ? json.reservations : [];
-      const meta = json?.meta ?? {};
+
+      const json: unknown = await res.json();
+      const payload: ReservationsApiShape = isRecord(json)
+        ? (json as ReservationsApiShape)
+        : {};
+      const items = asApiItems(payload.reservations);
+      const meta = asApiMeta(payload.meta);
+
       const mapped: ReservationListResponse = {
-        data: items.map((r: any) => ({
-          id: String(r.id),
-          createdAt: String(r.createdAt ?? r.created_at ?? ''),
-          date: String(r.date ?? ''),
-          slotLabel: r.slot ?? r.slotLabel ?? null,
-          partySize:
-            (r.partySize ??
-              r.adultCount + r.studentCount + r.childCount + r.infantCount ??
-              0) || 0,
-          amount: Number(r.amount ?? 0),
-          currency: String(r.currency ?? 'JPY'),
-          customerName: String(r.customerName ?? ''),
-          status: String(r.status ?? 'PENDING'),
-        })),
-        total: Number(meta.total ?? 0),
-        page: Number(meta.page ?? p),
-        pageSize: Number(meta.limit ?? pageSize),
+        data: items.map((r): Reservation => {
+          const partySize =
+            r.partySize ??
+            (toNum(r.adultCount) +
+              toNum(r.studentCount) +
+              toNum(r.childCount) +
+              toNum(r.infantCount));
+
+          const slotLabel: Reservation['slotLabel'] =
+            r.slotLabel ?? (typeof r.slot === 'string' ? r.slot : undefined);
+
+          return {
+            id: toStr(r.id, ''),
+            createdAt: toStr(r.createdAt ?? r.created_at, ''),
+            date: toStr(r.date, ''),
+            slotLabel,
+            partySize: partySize || 0,
+            amount: toNum(r.amount, 0),
+            currency: toStr(r.currency, 'JPY'),
+            customerName: toStr(r.customerName, ''),
+            status: normalizeStatus(r.status),
+          };
+        }),
+        total: toNum(meta.total, 0),
+        page: toNum(meta.page, p),
+        pageSize: toNum(meta.limit, pageSize),
       };
+
       setData(mapped.data);
       setTotal(mapped.total);
       setPage(mapped.page);
-    } catch (e) {
+    } catch (e: unknown) {
       console.error(e);
-      alert('予約一覧の取得に失敗しましたで御座る');
+      alert(
+        `予約一覧の取得に失敗しましたで御座る：${
+          e instanceof Error ? e.message : '不明なエラー'
+        }`
+      );
     } finally {
       setLoading(false);
     }
@@ -74,17 +133,25 @@ export default function ReservationTable({ initial }: Props) {
         credentials: 'include',
         body: JSON.stringify({ action: 'cancel', reason }),
       });
-      const json = await res.json();
-      if (!res.ok || !json?.ok) {
-        alert(`キャンセルに失敗しましたで御座る：${json?.error ?? res.status}`);
+      const json: unknown = await res.json();
+      const okFlag = isRecord(json) && (json as { ok?: boolean }).ok === true;
+
+      if (!res.ok || !okFlag) {
+        const msg = isRecord(json)
+          ? toStr((json as { error?: unknown }).error, String(res.status))
+          : String(res.status);
+        alert(`キャンセルに失敗しましたで御座る：${msg}`);
         return;
       }
       alert('キャンセルを受け付けましたで御座る');
-      // 現在のページを再取得して反映
       await load(page);
-    } catch (e) {
+    } catch (e: unknown) {
       console.error(e);
-      alert('通信に失敗しましたで御座る');
+      alert(
+        `通信に失敗しましたで御座る：${
+          e instanceof Error ? e.message : '不明なエラー'
+        }`
+      );
     } finally {
       setSubmittingId(null);
     }
@@ -107,12 +174,20 @@ export default function ReservationTable({ initial }: Props) {
           </thead>
           <tbody className="divide-y divide-slate-100 text-sm">
             {loading ? (
-              <tr><td className="px-4 py-8 text-center text-slate-500" colSpan={7}>読み込み中で御座る…</td></tr>
+              <tr>
+                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                  読み込み中で御座る…
+                </td>
+              </tr>
             ) : data.length === 0 ? (
-              <tr><td className="px-4 py-8 text-center text-slate-500" colSpan={7}>該当データがありませんで御座る</td></tr>
+              <tr>
+                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                  該当データがありませんで御座る
+                </td>
+              </tr>
             ) : (
               data.map((r) => {
-                const isCancelled = String(r.status).toUpperCase() === 'CANCELLED';
+                const isCancelled = r.status === 'CANCELED';
                 return (
                   <tr key={r.id} className="hover:bg-slate-50">
                     <td className="px-4 py-3">{formatDate(r.createdAt)}</td>
@@ -122,7 +197,9 @@ export default function ReservationTable({ initial }: Props) {
                     <td className="px-4 py-3" suppressHydrationWarning>
                       {formatCurrency(r.amount, r.currency)}
                     </td>
-                    <td className="px-4 py-3"><StatusBadge status={r.status as any} /></td>
+                    <td className="px-4 py-3">
+                      <StatusBadge status={r.status} />
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <button
@@ -179,29 +256,21 @@ export default function ReservationTable({ initial }: Props) {
 function formatDate(iso: string) {
   try {
     const d = new Date(iso);
-    const y = d.getFullYear();
-    const m = `${d.getMonth() + 1}`.padStart(2, '0');
-    const day = `${d.getDate()}`.padStart(2, '0');
-    const hh = `${d.getHours()}`.padStart(2, '0');
-    const mm = `${d.getMinutes()}`.padStart(2, '0');
-    return `${y}/${m}/${day} ${hh}:${mm}`;
+    return `${d.getFullYear()}/${`${d.getMonth() + 1}`.padStart(2, '0')}/${`${d.getDate()}`.padStart(2, '0')} ${`${d.getHours()}`.padStart(2, '0')}:${`${d.getMinutes()}`.padStart(2, '0')}`;
   } catch {
     return iso;
   }
 }
 
-// 揺れない JPY フォーマッタ
 function formatCurrency(amount: number, currency = 'JPY') {
   if (currency === 'JPY') {
     const n = Math.round(Number.isFinite(amount) ? amount : 0);
-    const s = n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    return `¥${s}`;
+    return `¥${n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
   }
   try {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
   } catch {
     const n = Math.round(Number.isFinite(amount) ? amount : 0);
-    const s = n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    return `${currency} ${s}`;
+    return `${currency} ${n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
   }
 }

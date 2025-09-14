@@ -1,4 +1,3 @@
-// src/components/CheckoutButton.tsx
 "use client";
 
 import { useState } from "react";
@@ -9,10 +8,12 @@ type Props = {
   defaultMock?: boolean;           // 初期モックON/OFF
 };
 
+type Outcome = "success" | "decline" | "cancel";
+
 export default function CheckoutButton({ amount, currency = "jpy", defaultMock = true }: Props) {
   const [loading, setLoading] = useState(false);
   const [useMock, setUseMock] = useState(defaultMock);
-  const [outcome, setOutcome] = useState<"success"|"decline"|"cancel">("success");
+  const [outcome, setOutcome] = useState<Outcome>("success");
 
   const startCheckout = async () => {
     try {
@@ -29,16 +30,17 @@ export default function CheckoutButton({ amount, currency = "jpy", defaultMock =
         body: JSON.stringify({
           amount,
           currency,
-          metadata: { via: "ui", outcome }, // モック時のみ outcome が使われる
+          metadata: { via: "ui", outcome }, // outcome は Outcome 型
         }),
       });
 
       const json = await res.json();
-      if (!res.ok) throw new Error(json?.error ?? "checkout failed");
-      if (!json?.url) throw new Error("missing redirect url");
-      window.location.href = json.url as string;
-    } catch (e) {
-      alert((e as Error).message);
+      if (!res.ok) throw new Error((json as { error?: string })?.error ?? "checkout failed");
+      if (!(json as { url?: string })?.url) throw new Error("missing redirect url");
+
+      window.location.href = (json as { url: string }).url;
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "不明なエラーが発生しましたで御座る");
     } finally {
       setLoading(false);
     }
@@ -60,7 +62,7 @@ export default function CheckoutButton({ amount, currency = "jpy", defaultMock =
           <select
             className="border rounded px-2 py-1"
             value={outcome}
-            onChange={(e) => setOutcome(e.target.value as any)}
+            onChange={(e) => setOutcome(e.target.value as Outcome)}
             title="モック時の結果を選べるで御座る"
           >
             <option value="success">success</option>

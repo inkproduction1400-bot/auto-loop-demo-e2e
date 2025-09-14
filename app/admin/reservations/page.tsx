@@ -1,4 +1,3 @@
-// app/admin/reservations/page.tsx
 'use client';
 
 import React, { Suspense, useEffect, useMemo, useState } from 'react';
@@ -90,8 +89,12 @@ function ReservationsPageInner() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json: ApiResponse = await res.json();
         if (!cancelled) setData(json);
-      } catch (e: any) {
-        if (!cancelled) setErr(e?.message ?? 'fetch error');
+      } catch (e: unknown) {
+        if (!cancelled) {
+          const msg =
+            e instanceof Error ? e.message : typeof e === 'string' ? e : 'fetch error';
+          setErr(msg);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -173,9 +176,12 @@ function ReservationsPageInner() {
               </thead>
               <tbody>
                 {data.items.map((r) => {
-                  const c = (r.counts ?? {}) as Record<string, number>;
+                  const c = r.counts ?? {};
                   const totalPeople =
-                    (c.adult ?? 0) + (c.student ?? 0) + (c.child ?? 0) + (c.infant ?? 0);
+                    (c.adult ?? 0) +
+                    (c.student ?? 0) +
+                    (c.child ?? 0) +
+                    (c.infant ?? 0);
                   return (
                     <tr key={r.id}>
                       <td>{new Date(r.createdAt).toLocaleString('ja-JP')}</td>
@@ -194,7 +200,9 @@ function ReservationsPageInner() {
                         )}
                       </td>
                       <td>
-                        <span className={`${styles.chip} ${styles[`chip_${r.status.toLowerCase()}`]}`}>
+                        <span
+                          className={`${styles.chip} ${styles[`chip_${r.status.toLowerCase()}`]}`}
+                        >
                           {r.status}
                         </span>
                       </td>

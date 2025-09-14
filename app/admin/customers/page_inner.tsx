@@ -57,8 +57,12 @@ export default function CustomersPageInner() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json: ApiResponse = await res.json();
         if (!cancelled) setData(json);
-      } catch (e: any) {
-        if (!cancelled) setErr(e?.message ?? 'fetch error');
+      } catch (e: unknown) {
+        if (!cancelled) {
+          const msg =
+            e instanceof Error ? e.message : typeof e === 'string' ? e : 'fetch error';
+          setErr(msg);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }

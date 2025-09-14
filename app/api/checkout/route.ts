@@ -18,13 +18,21 @@ function toStringRecord(obj: Record<string, unknown> | undefined): Record<string
   );
 }
 
+// リクエストPayload型（最低限）
+type Payload = {
+  reservationId?: string;
+  metadata?: Record<string, unknown> & {
+    reservationId?: string;
+    via?: string;
+    outcome?: string;
+  };
+};
+
 /** Prisma を遅延 import（prisma generate 未実行でもビルドを通す） */
-async function getPrisma(): Promise<null | InstanceType<any>> {
+async function getPrisma(): Promise<import("@prisma/client").PrismaClient | null> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const mod = await import("@prisma/client");
-    const PrismaClient = (mod as any).PrismaClient;
-    return new PrismaClient();
+    return new mod.PrismaClient();
   } catch {
     return null;
   }
@@ -44,13 +52,12 @@ async function getPrisma(): Promise<null | InstanceType<any>> {
  * }
  */
 export async function POST(req: Request) {
-  return await Sentry.startSpan({ name: "checkout.process" }, async (rootSpan) => {
+  return Sentry.startSpan({ name: "checkout.process" }, async () => {
     // ---- リクエストボディ parse
-    let body: any = {};
+    let body: Payload = {};
     try {
-      body = await Sentry.startSpan({ name: "checkout.parse" }, async (parseSpan) => {
-        const json = await req.json().catch(() => ({}));
-        parseSpan?.setAttribute?.("payload.size", JSON.stringify(json).length);
+      body = await Sentry.startSpan({ name: "checkout.parse" }, async () => {
+        const json = (await req.json().catch(() => ({}))) as Payload;
         return json;
       });
     } catch {
@@ -78,63 +85,51 @@ export async function POST(req: Request) {
     // ---- 予約をDBから取得して金額を確定
     const prisma = await getPrisma();
     if (!prisma) {
-      Sentry.captureMessage("Prisma not available on checkout", "error");
+      Sentry.captureMessage("Prisma not available on checkout", { level: "error" });
       return jsonError("server not ready", 503);
     }
 
-    const loaded = await Sentry.startSpan(
-      { name: "checkout.load_reservation" },
-      async (span) => {
-        const r = await (prisma as any).reservation.findUnique({
-          where: { id: String(reservationId) },
-          select: { id: true, amount: true },
-        });
-        if (!r) throw new Error("reservation_not_found");
-        span?.setAttribute?.("reservation.id", r.id);
-        span?.setAttribute?.("reservation.amount", r.amount);
-        return { reservation: r, amount: Number(r.amount || 0), currency: "jpy" as const };
-      }
-    ).catch((err) => {
-      if (String(err?.message) === "reservation_not_found") return null;
+    const loaded = await Sentry.startSpan({ name: "checkout.load_reservation" }, async () => {
+      const r = await prisma.reservation.findUnique({
+        where: { id: String(reservationId) },
+        select: { id: true, amount: true },
+      });
+      if (!r) throw new Error("reservation_not_found");
+      return { reservation: r, amount: Number(r.amount || 0), currency: "jpy" as const };
+    }).catch((err: unknown) => {
+      if (err instanceof Error && err.message === "reservation_not_found") return null;
       throw err;
     });
 
     if (!loaded) {
-      try {
-        await (prisma as any).$disconnect?.();
-      } catch {}
+      await prisma.$disconnect().catch(() => {});
       return jsonError("reservation not found", 404);
     }
 
     const { amount, currency } = loaded;
     if (!Number.isFinite(amount) || amount <= 0) {
-      try {
-        await (prisma as any).$disconnect?.();
-      } catch {}
+      await prisma.$disconnect().catch(() => {});
       return jsonError("invalid reservation amount", 400);
     }
 
     // ---- metadata（サーバ側で最終確定）
     const metadata: Record<string, string> = {
-      ...toStringRecord(body?.metadata ?? {}),
+      ...toStringRecord(body?.metadata),
       reservationId: String(reservationId),
       via: (body?.metadata?.via as string) ?? "api",
     };
 
     // ---- モック分岐
     if (useMock) {
-      const res = await Sentry.startSpan({ name: "checkout.mock" }, async (mockSpan) => {
+      const res = await Sentry.startSpan({ name: "checkout.mock" }, async () => {
         const outcome = (metadata.outcome || "").toLowerCase();
         const status = outcome === "decline" || outcome === "cancel" ? "cancel" : "success";
-        mockSpan?.setAttribute?.("mock.status", status);
-        mockSpan?.setAttribute?.("reservation.id", reservationId);
 
         const params = new URLSearchParams({
           amount: String(amount),
           currency,
           status,
         });
-
         // ★ reservationId を引き継ぎ（後続の完了ハンドラ等で使える）
         params.set("reservationId", String(reservationId));
 
@@ -142,19 +137,15 @@ export async function POST(req: Request) {
         return NextResponse.json({ url: mockUrl }, { status: 200 });
       });
 
-      try {
-        await (prisma as any).$disconnect?.();
-      } catch {}
+      await prisma.$disconnect().catch(() => {});
       return res;
     }
 
     // ---- 実 Stripe 呼び出し
     const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY ?? "";
     if (!STRIPE_SECRET_KEY) {
-      try {
-        await (prisma as any).$disconnect?.();
-      } catch {}
-      Sentry.captureMessage("STRIPE_SECRET_KEY missing", "error");
+      await prisma.$disconnect().catch(() => {});
+      Sentry.captureMessage("STRIPE_SECRET_KEY missing", { level: "error" });
       return jsonError("Missing STRIPE_SECRET_KEY on server", 500);
     }
 
@@ -165,20 +156,16 @@ export async function POST(req: Request) {
     try {
       const session = await Sentry.startSpan(
         { name: "checkout.stripe.createSession" },
-        async (stripeSpan) => {
-          stripeSpan?.setAttribute?.("amount", amount);
-          stripeSpan?.setAttribute?.("currency", currency);
-          stripeSpan?.setAttribute?.("reservation.id", reservationId);
-
+        async () => {
           return await stripe.checkout.sessions.create({
             mode: "payment",
             payment_method_types: ["card"],
             line_items: [
               {
                 price_data: {
-                  currency,
-                  product_data: { name: "Reservation Fee" },
-                  unit_amount: Math.round(amount),
+                    currency,
+                    product_data: { name: "Reservation Fee" },
+                    unit_amount: Math.round(amount),
                 },
                 quantity: 1,
               },
@@ -191,23 +178,18 @@ export async function POST(req: Request) {
       );
 
       return NextResponse.json({ url: session.url }, { status: 200 });
-    } catch (err: any) {
+    } catch (err: unknown) {
       Sentry.captureException(err, { extra: { endpoint: "checkout.stripe.createSession" } });
       return jsonError("Stripe create session failed", 500);
     } finally {
-      try {
-        await (prisma as any).$disconnect?.();
-      } catch {
-        /* noop */
-      }
-      rootSpan?.end?.();
+      await prisma.$disconnect().catch(() => {});
     }
   });
 }
 
 // GET（疎通チェック用）
 export async function GET() {
-  return await Sentry.startSpan({ name: "checkout.get" }, async () => {
+  return Sentry.startSpan({ name: "checkout.get" }, async () => {
     if (process.env.E2E_STRIPE_MOCK === "1") {
       return NextResponse.json({ ok: true, mock: true });
     }

@@ -1,8 +1,8 @@
-// components/reservations/ReservationDetailClient.tsx
 'use client';
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 type ReservationDetail = {
   id: string;
@@ -110,14 +110,14 @@ export default function ReservationDetailClient({ detail }: { detail: Reservatio
         </dl>
 
         <div className="mt-8 flex gap-3">
-          <a
+          <Link
             href="/reservations"
             className="rounded-lg border px-3 py-1.5 text-sm hover:bg-slate-50"
           >
             一覧へ戻る
-          </a>
+          </Link>
           <button
-            className="rounded-lg border px-3 py-1.5 text-sm hover:bg-rose-50 disabled:opacity-50"
+            className="rounded-lg border px-3 py-1.5 text-sm text-rose-600 border-rose-300 hover:bg-rose-50 disabled:opacity-50"
             onClick={handleCancel}
             disabled={submitting || detail.status === 'CANCELLED'}
             title={
@@ -126,7 +126,11 @@ export default function ReservationDetailClient({ detail }: { detail: Reservatio
                 : '予約をキャンセルするで御座る'
             }
           >
-            {detail.status === 'CANCELLED' ? 'キャンセル済み' : 'キャンセルする'}
+            {submitting
+              ? '処理中…'
+              : detail.status === 'CANCELLED'
+              ? 'キャンセル済み'
+              : 'キャンセルする'}
           </button>
         </div>
       </div>
@@ -149,9 +153,14 @@ function formatDate(iso: string) {
 }
 
 function formatCurrency(amount: number, currency = 'JPY') {
+  if (currency === 'JPY') {
+    const n = Math.round(Number.isFinite(amount) ? amount : 0);
+    return `¥${n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+  }
   try {
-    return new Intl.NumberFormat('ja-JP', { style: 'currency', currency }).format(amount);
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
   } catch {
-    return `${amount.toLocaleString()} 円`;
+    const n = Math.round(Number.isFinite(amount) ? amount : 0);
+    return `${currency} ${n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
   }
 }

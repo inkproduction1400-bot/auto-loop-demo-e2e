@@ -1,12 +1,12 @@
 // app/api/admin/metrics/route.ts
 import { NextResponse } from "next/server";
-import * as Sentry from "@sentry/nextjs";
 import { getUidFromCookieOrHeader, isAdmin } from "@/lib/auth/isAdmin";
+import { withSpan } from "@/src/lib/obs/tracing";
 
-async function getPrisma(): Promise<any | null> {
+async function getPrisma() {
   try {
     const mod = await import("@prisma/client");
-    const PrismaClient = (mod as any).PrismaClient;
+    const { PrismaClient } = mod as typeof import("@prisma/client");
     return new PrismaClient();
   } catch {
     return null;
@@ -21,10 +21,11 @@ export async function GET(req: Request) {
 
   const uid = getUidFromCookieOrHeader(req);
   if (!isAdmin(uid)) {
+    await prisma.$disconnect().catch(() => {});
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   }
 
-  return Sentry.startSpan({ name: "admin.metrics" }, async (span) => {
+  return withSpan("admin.metrics", async (span) => {
     try {
       const [totalReservations, revenue, latest] = await Promise.all([
         prisma.reservation.count(),
@@ -47,12 +48,12 @@ export async function GET(req: Request) {
           latest,
         },
       });
-    } catch (e: any) {
-      Sentry.captureException(e);
-      return NextResponse.json({ ok: false, error: e?.message ?? "error" }, { status: 500 });
+    } catch (e) {
+      console.error("Metrics error:", e);
+      return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "error" }, { status: 500 });
     } finally {
       await prisma.$disconnect().catch(() => {});
-      span.end?.();
+      span.setAttribute?.("finished", "true");
     }
   });
 }

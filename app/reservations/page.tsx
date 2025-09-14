@@ -1,5 +1,6 @@
-// app/(app)/reservations/[id]/page.tsx
+// app/(app)/reservations/page.tsx
 import { cookies } from 'next/headers';
+import Link from 'next/link';
 
 type ReservationDetail = {
   id: string;
@@ -20,99 +21,86 @@ type ReservationDetail = {
 
 export const dynamic = 'force-dynamic';
 
-async function fetchDetail(id: string): Promise<ReservationDetail | null> {
-  // Cookie もしくは DEV 用 UID をヘッダに載せる
+async function fetchReservations(): Promise<ReservationDetail[]> {
   const uid = cookies().get('uid')?.value ?? '';
   const devUid = process.env.NEXT_PUBLIC_DEV_USER_ID ?? '';
   const userIdHeader = uid || devUid;
 
   const res = await fetch(
-    `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/api/reservations/${id}`,
-    { cache: 'no-store', headers: userIdHeader ? { 'x-user-id': userIdHeader } : undefined }
+    `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/api/reservations?scope=me`,
+    {
+      cache: 'no-store',
+      headers: userIdHeader ? { 'x-user-id': userIdHeader } : undefined,
+    }
   );
-  if (!res.ok) return null;
+  if (!res.ok) return [];
   const json = await res.json();
-  return (json?.reservation ?? null) as ReservationDetail | null;
+  return (json?.reservations ?? []) as ReservationDetail[];
 }
 
-export default async function Page({ params }: { params: { id: string } }) {
-  const detail = await fetchDetail(params.id);
+export default async function Page() {
+  const reservations = await fetchReservations();
 
-  if (!detail) {
+  if (reservations.length === 0) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-10">
-        <h1 className="text-2xl font-semibold">予約詳細</h1>
-        <p className="mt-4 text-slate-600">予約が見つからないか、権限がありませんで御座る。</p>
-        <div className="mt-6">
-          <a href="/reservations" className="rounded-lg border px-3 py-1.5 text-sm hover:bg-slate-50">
-            一覧へ戻る
-          </a>
-        </div>
+        <h1 className="text-2xl font-semibold">予約一覧</h1>
+        <p className="mt-4 text-slate-600">
+          予約が存在しませんで御座る。
+        </p>
       </div>
     );
   }
 
-  const totalParty =
-    (detail.adultCount ?? 0) +
-    (detail.studentCount ?? 0) +
-    (detail.childCount ?? 0) +
-    (detail.infantCount ?? 0);
-
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
-      <h1 className="text-2xl font-semibold">予約詳細</h1>
-      <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <dt className="text-xs text-slate-500">予約ID</dt>
-            <dd className="mt-1 font-mono text-sm">{detail.id}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-slate-500">作成日時</dt>
-            <dd className="mt-1 text-sm">{formatDate(detail.createdAt)}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-slate-500">日付</dt>
-            <dd className="mt-1 text-sm">{formatDate(detail.date)}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-slate-500">枠</dt>
-            <dd className="mt-1 text-sm">{detail.slot ?? '-'}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-slate-500">人数</dt>
-            <dd className="mt-1 text-sm">{totalParty} 名</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-slate-500">金額</dt>
-            <dd className="mt-1 text-sm" suppressHydrationWarning>
-              {formatCurrency(detail.amount, 'JPY')}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs text-slate-500">状態</dt>
-            <dd className="mt-1 text-sm">{detail.status}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-slate-500">顧客</dt>
-            <dd className="mt-1 text-sm">
-              {detail.customer?.name ?? '-'}（{detail.customer?.email ?? '-'}）
-            </dd>
-          </div>
-          {detail.notes ? (
-            <div className="sm:col-span-2">
-              <dt className="text-xs text-slate-500">メモ</dt>
-              <dd className="mt-1 whitespace-pre-wrap text-sm">{detail.notes}</dd>
-            </div>
-          ) : null}
-        </dl>
-
-        <div className="mt-8 flex gap-3">
-          <a href="/reservations" className="rounded-lg border px-3 py-1.5 text-sm hover:bg-slate-50">
-            一覧へ戻る
-          </a>
-          {/* 今後：キャンセルや領収書DLなどのボタンをここに追加するで御座る */}
-        </div>
+    <div className="mx-auto max-w-4xl px-4 py-10">
+      <h1 className="text-2xl font-semibold">予約一覧</h1>
+      <div className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <table className="w-full table-fixed">
+          <thead className="bg-slate-50 text-slate-600">
+            <tr className="text-left text-sm">
+              <th className="px-4 py-3 w-[140px]">作成日時</th>
+              <th className="px-4 py-3 w-[140px]">日付</th>
+              <th className="px-4 py-3 w-[120px]">枠</th>
+              <th className="px-4 py-3 w-[80px]">人数</th>
+              <th className="px-4 py-3 w-[120px]">金額</th>
+              <th className="px-4 py-3 w-[120px]">状態</th>
+              <th className="px-4 py-3 w-[140px]">詳細</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 text-sm">
+            {reservations.map((r) => {
+              const totalParty =
+                (r.adultCount ?? 0) +
+                (r.studentCount ?? 0) +
+                (r.childCount ?? 0) +
+                (r.infantCount ?? 0);
+              return (
+                <tr key={r.id} className="hover:bg-slate-50">
+                  <td className="px-4 py-3">{formatDate(r.createdAt)}</td>
+                  <td className="px-4 py-3">{formatDate(r.date)}</td>
+                  <td className="px-4 py-3">{r.slot ?? '-'}</td>
+                  <td className="px-4 py-3">{totalParty}</td>
+                  <td
+                    className="px-4 py-3"
+                    suppressHydrationWarning
+                  >
+                    {formatCurrency(r.amount, 'JPY')}
+                  </td>
+                  <td className="px-4 py-3">{r.status}</td>
+                  <td className="px-4 py-3">
+                    <Link
+                      href={`/reservations/${r.id}`}
+                      className="rounded-lg border px-3 py-1 text-xs hover:bg-slate-100"
+                    >
+                      詳細
+                    </Link>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -132,18 +120,21 @@ function formatDate(iso: string) {
   }
 }
 
-// 揺れない通貨フォーマッタ（SSR/CSR 一致）
+// 揺れない通貨フォーマッタ
 function formatCurrency(amount: number, currency = 'JPY') {
   if (currency === 'JPY') {
     const n = Math.round(Number.isFinite(amount) ? amount : 0);
-    const s = n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    return `¥${s}`;
+    return `¥${n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
   }
   try {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+    }).format(amount);
   } catch {
     const n = Math.round(Number.isFinite(amount) ? amount : 0);
-    const s = n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    return `${currency} ${s}`;
+    return `${currency} ${n
+      .toString()
+      .replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
   }
 }

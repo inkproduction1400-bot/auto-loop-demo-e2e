@@ -1,4 +1,3 @@
-// src/lib/csv.ts
 /**
  * CSV 文字列化（Excel 互換のため BOM 付与を想定）
  * - 値はダブルクォートで囲み、内部の `"` は `""` にエスケープ
@@ -9,8 +8,10 @@ export function toCSV(rows: Array<Record<string, unknown>>, headers?: string[]):
       return '\uFEFF'; // BOM のみ
     }
   
-    const cols = headers && headers.length > 0 ? headers : Object.keys(rows[0]);
-    const escape = (v: unknown) => {
+    const cols: string[] =
+      headers && headers.length > 0 ? headers : Object.keys(rows[0]);
+  
+    const escape = (v: unknown): string => {
       if (v === null || v === undefined) return '';
       const s = String(v);
       if (/[",\r\n\t]/.test(s)) {
@@ -20,9 +21,18 @@ export function toCSV(rows: Array<Record<string, unknown>>, headers?: string[]):
     };
   
     const lines: string[] = [];
-    lines.push(cols.map(escape).join(','));
+    // ヘッダ行
+    lines.push(cols.map((c) => escape(c)).join(','));
+    // データ行
     for (const r of rows) {
-      lines.push(cols.map((c) => escape((r as any)[c])).join(','));
+      lines.push(
+        cols
+          .map((c) => {
+            const val: unknown = r[c];
+            return escape(val);
+          })
+          .join(',')
+      );
     }
     // 先頭に BOM を付ける（Excel での文字化け防止）
     return '\uFEFF' + lines.join('\r\n');

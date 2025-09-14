@@ -1,7 +1,7 @@
 // app/api/admin/export/customers.csv/route.ts
 import { NextResponse } from "next/server";
-import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@/lib/prisma";
+import { withSpan } from "@/src/lib/obs/tracing";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +31,7 @@ type CustomerRow = {
 };
 
 export async function GET(req: Request) {
-  return Sentry.startSpan({ name: "admin_export.customers.csv" }, async (span) => {
+  return withSpan("admin_export.customers.csv", async (span) => {
     try {
       const url = new URL(req.url);
       const limit = Math.min(10_000, Math.max(1, Number(url.searchParams.get("limit") ?? 1000)));
@@ -61,7 +61,7 @@ export async function GET(req: Request) {
         "reservations_count",
       ]);
 
-      const res = new NextResponse(csv, {
+      return new NextResponse(csv, {
         status: 200,
         headers: {
           "Content-Type": "text/csv; charset=utf-8",
@@ -69,9 +69,8 @@ export async function GET(req: Request) {
           "Content-Disposition": `attachment; filename="customers.csv"`,
         },
       });
-      return res;
     } catch (err) {
-      Sentry.captureException(err, { extra: { endpoint: "admin_export.customers.csv" } });
+      console.error("Export customers.csv failed:", err);
       return NextResponse.json({ ok: false, error: "export_failed" }, { status: 500 });
     }
   });
