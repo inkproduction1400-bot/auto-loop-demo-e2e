@@ -1,7 +1,11 @@
 // app/dev/email-preview/page.tsx
+
+// ✅ ビルド時プリレンダーを抑止（SSG 対象外にする）
+export const dynamic = 'force-dynamic';
+
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -9,11 +13,27 @@ import {
   buildPaymentSucceeded,
 } from '@/lib/notify/templates';
 
+// ✅ CI や本番で開発用ページを完全無効化したい場合は
+//    NEXT_PUBLIC_DISABLE_DEV_ROUTES=1 を環境変数に設定（Actions でも可）
+const DISABLED = process.env.NEXT_PUBLIC_DISABLE_DEV_ROUTES === '1';
+
 function sanitize(v: unknown) {
   return v === null || v === undefined ? '' : String(v);
 }
 
 export default function EmailPreviewPage() {
+  // 🚫 さらに厳格: 無効化フラグ時は即座にトップへ退避（クライアントだけ）
+  useEffect(() => {
+    if (DISABLED && typeof window !== 'undefined') {
+      window.location.replace('/');
+    }
+  }, []);
+
+  if (DISABLED) {
+    // SSR/CSR 両方で安全に「何も描画しない」
+    return null;
+  }
+
   const sp = useSearchParams();
 
   // searchParams を plain object に変換（安定化用）
@@ -34,7 +54,7 @@ export default function EmailPreviewPage() {
       amount: String(Number(spObj.amount ?? '3000')), // 数値化して文字列化
       currency: sanitize(spObj.currency ?? 'JPY'),
     }),
-    [spObj] // 依存は plain object なので OK
+    [spObj]
   );
 
   // テンプレ適用
