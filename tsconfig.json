@@ -23,6 +23,7 @@
         "@app/*": ["./app/*", "./src/app/*"]
       },
   
+      "types": ["@types/node", "@playwright/test"],
       "plugins": [{ "name": "next" }]
     },
     "include": [
